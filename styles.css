@@ -1,0 +1,180 @@
+.inventario-filter-table {
+    border-collapse: collapse;
+    background: transparent;
+    width: 100%;
+}
+.inventario-actions-col {
+    white-space: nowrap;
+    word-break: keep-all;
+}
+
+.inventario-filter-row {
+    border-bottom: 1px solid #ddd;
+}
+
+.inventario-license-card {
+    max-width: 420px;
+}
+
+.inventario-license-details {
+    margin-left: auto;
+    position: relative;
+    display: inline-block;
+    text-align: right;
+}
+
+.inventario-nav .btn.active {
+    box-shadow: 0 0 0 0.12rem rgba(13, 110, 253, 0.35);
+}
+
+.inventario-license-details summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+.inventario-license-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.inventario-license-details .inventario-license-card {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    width: 360px;
+    max-width: min(420px, 90vw);
+    margin-top: 0;
+    z-index: 10;
+}
+
+.inventario-metric-card {
+    background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
+    color: #fff;
+}
+
+.inventario-metric-block {
+    min-width: 200px;
+}
+
+.inventario-child-property {
+    font-size: 0.85rem;
+    padding-left: 16px;
+}
+.inventario-color-chip {
+    width: 16px;
+    height: 16px;
+    display: inline-block;
+    border-radius: 4px;
+    border: 1px solid #e5e7eb;
+    vertical-align: middle;
+}
+.inventario-calendar-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+}
+.inventario-calendar-table th {
+    background: #f8fafc;
+    padding: 8px;
+}
+.inventario-calendar-cell {
+    position: relative;
+    height: 180px;
+    vertical-align: top;
+    padding: 8px;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    width: 14.2857%;
+    overflow: hidden;
+}
+.inventario-calendar-cell.empty {
+    background: #f9fafb;
+}
+.inventario-calendar-day {
+    font-weight: 700;
+    margin-bottom: 6px;
+    font-size: 0.95rem;
+}
+.inventario-calendar-events {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 120px;
+    overflow: hidden;
+    width: 100%;
+}
+.inventario-calendar-event {
+    background: var(--event-color, #2563eb);
+    color: #fff;
+    border-radius: 6px;
+    padding: 6px 8px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    width: 100%;
+    overflow: hidden;
+}
+.inventario-calendar-event-title {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.inventario-calendar-event-meta {
+    font-size: 0.8rem;
+    opacity: 0.9;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.inventario-calendar-event-hidden {
+    display: none;
+}
+.inventario-calendar-cell.expanded .inventario-calendar-events {
+    max-height: none;
+    overflow: visible;
+}
+
+.inventario-calendar-cell.today {
+    outline: 2px solid #2563eb;
+    outline-offset: -2px;
+    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.2);
+}
+.inventario-calendar-cell.expanded .inventario-calendar-event-hidden {
+    display: block;
+}
+.inventario-calendar-more {
+    margin-top: 4px;
+}
+.inventario-calendar-showmore {
+    font-size: 0.85rem;
+}
+.inventario-calendar-event-type {
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    display: inline-block;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+}
+.inventario-calendar-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+/* Softer shadow on dashboard cards (index page) to match Moodle defaults. */
+.inventario-dashboard .shadow-sm {
+    box-shadow: 0 .125rem .25rem rgba(0, 0, 0, 0.075) !important;
+}
+
+.inventario-reservation-focus {
+    background-color: #fff9db;
+}
+
+.inventario-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+@media (max-width: 768px) {
+    .inventario-calendar-cell {
+        height: 200px;
+    }
+}

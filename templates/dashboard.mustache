@@ -1,0 +1,211 @@
+<div class="inventario-dashboard">
+    <div class="d-flex justify-content-end">
+        <details class="mb-3 inventario-license-details">
+            <summary class="btn btn-outline-info btn-sm d-inline-block">{{#str}}licenseinfo, local_inventario{{/str}}</summary>
+            <div class="card shadow-sm mt-2 inventario-license-card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted small">{{#str}}license, local_inventario{{/str}}</span>
+                        <span class="badge bg-secondary text-uppercase">{{license.status}}</span>
+                    </div>
+                    <div class="fw-bold">{{#str}}licensedomain, local_inventario, {{license.domain}}{{/str}}</div>
+                    {{#license.expires}}
+                        <div class="text-muted small">{{#str}}licenseexpires, local_inventario, {{license.expires}}{{/str}}</div>
+                    {{/license.expires}}
+                    {{^license.expires}}
+                        <div class="text-muted small">{{#str}}licensevalid, local_inventario{{/str}}</div>
+                    {{/license.expires}}
+                    {{^license.allowhidden}}
+                        <div class="mt-2 alert alert-warning p-2 mb-0">
+                            {{#str}}licenseinvalid, local_inventario{{/str}}
+                            <div class="small text-muted mb-1">{{#str}}licensefreeinfo, local_inventario{{/str}}</div>
+                            <div class="small text-muted">{{#str}}licensedomain, local_inventario, {{license.domain}}{{/str}}</div>
+                        </div>
+                    {{/license.allowhidden}}
+                </div>
+            </div>
+        </details>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 h-100 bg-light">
+                <div class="card-body">
+                    <div class="text-muted mb-1 text-uppercase fw-bold">{{#str}}objects, local_inventario{{/str}}</div>
+                    <div class="fs-3 fw-bold">{{stats.objects}}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 h-100 bg-light">
+                <div class="card-body">
+                    <div class="text-muted mb-1 text-uppercase fw-bold">{{#str}}reservationsactive, local_inventario{{/str}}</div>
+                    <div class="fs-3 fw-bold">{{stats.reservations}}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 h-100 bg-light">
+                <div class="card-body">
+                    <div class="text-muted mb-1 text-uppercase fw-bold">{{#str}}myreservationscount, local_inventario{{/str}}</div>
+                    <div class="fs-3 fw-bold">{{stats.userreservations}}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h3>{{#str}}objectslist, local_inventario{{/str}}</h3>
+    <form method="get" action="" class="row g-2 align-items-end mb-3">
+        <div class="col-md-3">
+            <label class="form-label" for="search">{{#str}}search{{/str}}</label>
+            <input type="text" class="form-control" name="search" id="search" value="{{objectfilters.search}}">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="typeid">{{#str}}type, local_inventario{{/str}}</label>
+            <select class="custom-select w-100" name="typeid" id="typeid">
+                <option value="0">{{#str}}all, local_inventario{{/str}}</option>
+                {{#objectfilters.types}}
+                    <option value="{{id}}" {{#selected}}selected{{/selected}}>{{name}}</option>
+                {{/objectfilters.types}}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="status">{{#str}}status, local_inventario{{/str}}</label>
+            <select class="custom-select w-100" name="status" id="status">
+                {{#objectfilters.statuses}}
+                    <option value="{{value}}" {{#selected}}selected{{/selected}}>{{label}}</option>
+                {{/objectfilters.statuses}}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="siteid">{{#str}}site, local_inventario{{/str}}</label>
+            <select class="custom-select w-100" name="siteid" id="siteid">
+                <option value="0">{{#str}}all, local_inventario{{/str}}</option>
+                {{#objectfilters.sites}}
+                    <option value="{{id}}" {{#selected}}selected{{/selected}}>{{name}}</option>
+                {{/objectfilters.sites}}
+            </select>
+        </div>
+        <div class="col-md-12 text-end">
+            <div class="d-flex justify-content-end align-items-center gap-2 mt-2 flex-wrap">
+                <label class="mb-0 me-2" for="perpage">{{#str}}itemsperpage, local_inventario{{/str}}</label>
+                <select class="custom-select w-auto" name="perpage" id="perpage">
+                    {{#objectfilters.perpageoptions}}
+                        <option value="{{value}}" {{#selected}}selected{{/selected}}>{{label}}</option>
+                    {{/objectfilters.perpageoptions}}
+                </select>
+                <a href="{{links.objects}}" class="btn btn-outline-secondary btn-sm ms-2">{{#str}}resetfilters, local_inventario{{/str}}</a>
+                <button type="submit" class="btn btn-primary btn-sm ms-2">{{#str}}filter, local_inventario{{/str}}</button>
+            </div>
+        </div>
+    </form>
+    <div class="table-responsive">
+        <table class="generaltable inventario-table">
+            <thead>
+                <tr>
+                    <th>{{#str}}object, local_inventario{{/str}}</th>
+                    <th>{{#str}}site, local_inventario{{/str}}</th>
+                    <th>{{#str}}status, local_inventario{{/str}}</th>
+                    <th>{{#str}}lastreservation, local_inventario{{/str}}</th>
+                    <th>{{#str}}actions{{/str}}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#objects}}
+                    <tr class="{{^visible}}dimmed_text{{/visible}}">
+                        <td>{{{name_badge}}}</td>
+                        <td>{{site}}</td>
+                        <td>{{{status}}}</td>
+                        <td>
+                            {{#lastreservation}}
+                                {{user}} ({{period}})
+                            {{/lastreservation}}
+                            {{^lastreservation}}
+                                -
+                            {{/lastreservation}}
+                        </td>
+                        <td>
+                            <span class="d-inline-flex align-items-center gap-2">
+                                <a href="#"
+                                   class="inventario-object-info"
+                                   data-detail-id="inventario-object-detail-{{id}}"
+                                   data-detail-title="{{detail_title}}"
+                                   title="{{#str}}info{{/str}}">
+                                    <span class="fa fa-info-circle text-info" aria-hidden="true"></span>
+                                    <span class="sr-only">{{#str}}info{{/str}}</span>
+                                </a>
+                                <span class="text-muted mx-1">|</span>
+                                <a href="{{reserve_url}}"
+                                   title="{{#str}}reserve, local_inventario{{/str}}">
+                                    <span class="fa fa-calendar-plus text-primary" aria-hidden="true"></span>
+                                    <span class="sr-only">{{#str}}reserve, local_inventario{{/str}}</span>
+                                </a>
+                            </span>
+                            <div id="inventario-object-detail-{{id}}" class="d-none">{{{detail_html}}}</div>
+                        </td>
+                    </tr>
+                {{/objects}}
+                {{^objects}}
+                    <tr><td colspan="5">{{#str}}noobjects, local_inventario{{/str}}</td></tr>
+                {{/objects}}
+            </tbody>
+        </table>
+    </div>
+
+    <h3>{{#str}}reservations, local_inventario{{/str}}</h3>
+    <form method="get" action="" class="d-flex justify-content-end align-items-center gap-2 mb-2 flex-wrap">
+        <input type="hidden" name="search" value="{{objectfilters.search}}">
+        <input type="hidden" name="typeid" value="{{objectfilters.selectedtype}}">
+        <input type="hidden" name="status" value="{{objectfilters.selectedstatus}}">
+        <input type="hidden" name="siteid" value="{{objectfilters.selectedsite}}">
+        <input type="hidden" name="perpage" value="{{objectfilters.perpage}}">
+        <label class="mb-0 me-2" for="resperpage">{{#str}}itemsperpage, local_inventario{{/str}}</label>
+        <select class="custom-select w-auto me-2" name="resperpage" id="resperpage">
+            {{#reservationfilters.perpageoptions}}
+                <option value="{{value}}" {{#selected}}selected{{/selected}}>{{label}}</option>
+            {{/reservationfilters.perpageoptions}}
+        </select>
+        <button type="submit" class="btn btn-primary btn-sm">{{#str}}apply, moodle{{/str}}</button>
+    </form>
+    <div class="table-responsive">
+        <table class="generaltable inventario-table">
+            <thead>
+            <tr>
+                <th>{{#str}}object, local_inventario{{/str}}</th>
+                <th>{{#str}}user{{/str}}</th>
+                <th>{{#str}}site, local_inventario{{/str}}</th>
+                <th>{{#str}}period, local_inventario{{/str}}</th>
+                <th>{{#str}}location, local_inventario{{/str}}</th>
+            </tr>
+            </thead>
+            <tbody>
+            {{#reservations}}
+                <tr>
+                    <td>{{object}}</td>
+                    <td>{{user}}</td>
+                    <td>{{site}}</td>
+                    <td>{{period}}</td>
+                    <td>{{location}}</td>
+                </tr>
+            {{/reservations}}
+            {{^reservations}}
+                <tr><td colspan="5">{{#str}}noreservations, local_inventario{{/str}}</td></tr>
+    {{/reservations}}
+    </tbody>
+    </table>
+    </div>
+
+    <div class="modal fade" id="inventario-object-modal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">{{#str}}info{{/str}}</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="{{#str}}closebuttontitle{{/str}}">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body" id="inventario-object-modal-body"></div>
+            </div>
+        </div>
+    </div>
+</div>
