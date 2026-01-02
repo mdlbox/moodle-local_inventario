@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -53,7 +53,7 @@ if ($objectfilter && isset($objectslist[$objectfilter])) {
 $objectprops = [];
 if (!empty($objectslist)) {
     global $DB;
-    list($insql, $params) = $DB->get_in_or_equal(array_keys($objectslist), SQL_PARAMS_NAMED);
+    [$insql, $params] = $DB->get_in_or_equal(array_keys($objectslist), SQL_PARAMS_NAMED);
     $propsql = "SELECT pv.objectid, p.name, pv.value
                   FROM {local_inventario_propvals} pv
                   JOIN {local_inventario_properties} p ON p.id = pv.propertyid
@@ -69,12 +69,11 @@ if (!empty($objectslist)) {
         $objectprops[$pv->objectid][] = format_string($pv->name) . ': ' . s($value);
     }
 }
-
 // Prepare history per object (only for Pro).
 $objecthistory = [];
 if ($license->status === 'pro' && !empty($objectslist)) {
     global $DB;
-    list($insqlh, $paramsh) = $DB->get_in_or_equal(array_keys($objectslist), SQL_PARAMS_NAMED);
+    [$insqlh, $paramsh] = $DB->get_in_or_equal(array_keys($objectslist), SQL_PARAMS_NAMED);
     // Select reservation id first to keep array keys unique per reservation.
     $hsql = "SELECT r.id AS reservationid, r.objectid, r.timestart, r.timeend,
                     u.firstname, u.lastname, u.middlename, u.alternatename, u.firstnamephonetic, u.lastnamephonetic
@@ -87,7 +86,6 @@ if ($license->status === 'pro' && !empty($objectslist)) {
         $objecthistory[$h->objectid][] = fullname($h) . ' (' . userdate($h->timestart) . ' - ' . userdate($h->timeend) . ')';
     }
 }
-
 echo $OUTPUT->header();
 echo local_inventario_render_nav($context);
 
@@ -105,7 +103,7 @@ echo html_writer::div(
     html_writer::tag('h3', get_string('topobjects', 'local_inventario'), ['class' => 'h4 mb-3']) .
     (empty($usage)
         ? html_writer::div(get_string('nostats', 'local_inventario'), 'alert alert-info mb-0')
-        : html_writer::table((function() use ($usage) {
+        : html_writer::table((function () use ($usage) {
             $table = new html_table();
             $table->head = [
                 get_string('object', 'local_inventario'),
@@ -139,8 +137,7 @@ foreach ($objectslist as $obj) {
     $propsstr = $props ? html_writer::alist($props) : '-';
 
     $row = [
-        format_string($obj->name),
-        $propsstr,
+        format_string($obj->name), $propsstr,
     ];
     if ($license->status === 'pro') {
         $hist = $objecthistory[$obj->id] ?? [];
@@ -176,7 +173,6 @@ foreach ($objectslist as $obj) {
     }
     $objecttable->data[] = $row;
 }
-
 echo html_writer::div(
     html_writer::tag('h3', get_string('objects', 'local_inventario'), ['class' => 'h4 mb-3']) .
     html_writer::table($objecttable),
@@ -184,9 +180,28 @@ echo html_writer::div(
     ['id' => 'inventario-objects-block']
 );
 echo html_writer::end_div();
-
-$PAGE->requires->js_init_code("(function(){const toggles=document.querySelectorAll('.inventario-history-toggle');toggles.forEach(function(btn){btn.addEventListener('click',function(e){e.preventDefault();const target=document.getElementById(btn.dataset.target);if(!target){return;}const extras=target.querySelectorAll('.inventario-history-extra');if(!extras.length){return;}const hidden=extras[0].classList.contains('d-none');extras.forEach(function(el){el.classList.toggle('d-none',!hidden);});btn.textContent=hidden?btn.dataset.less:btn.dataset.more;});});})();");
+$PAGE->requires->js_init_code(<<<JS
+(function() {
+    const toggles = document.querySelectorAll('.inventario-history-toggle');
+    toggles.forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const target = document.getElementById(btn.dataset.target);
+            if (!target) {
+                return;
+            }
+            const extras = target.querySelectorAll('.inventario-history-extra');
+            if (!extras.length) {
+                return;
+            }
+            const hidden = extras[0].classList.contains('d-none');
+            extras.forEach(function(el) {
+                el.classList.toggle('d-none', !hidden);
+            });
+            btn.textContent = hidden ? btn.dataset.less : btn.dataset.more;
+        });
+    });
+})();
+JS
+);
 echo $OUTPUT->footer();
-
-
-

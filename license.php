@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -101,8 +101,16 @@ if (!empty($status->expiresat)) {
 }
 
 echo html_writer::alist($items);
-echo $OUTPUT->single_button(new moodle_url($PAGE->url, ['refresh' => 1, 'sesskey' => sesskey()]),
-    get_string('refreshlicense', 'local_inventario'));
+echo html_writer::div(
+    get_string(
+        'license_moreinfo',
+        'local_inventario',
+        html_writer::link('https://mdlbox.com', 'https://mdlbox.com', ['target' => '_blank', 'rel' => 'noopener'])
+    )
+);
+echo $OUTPUT->single_button(
+    new moodle_url($PAGE->url, ['refresh' => 1, 'sesskey' => sesskey()]),
+    get_string('refreshlicense', 'local_inventario')
+);
 
 echo $OUTPUT->footer();
-

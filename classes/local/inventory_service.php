@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -29,25 +29,43 @@ use dml_exception;
 use moodle_exception;
 use stdClass;
 use csv_import_reader;
+use core_user;
 
-defined('MOODLE_INTERNAL') || die();
-
-
+/**
+ * Service class for inventory CRUD and reservation workflows.
+ */
 class inventory_service {
     /** @var license_manager */
     private $license;
 
+    /**
+     * Inventory service constructor.
+     *
+     * @param license_manager|null $license Optional license manager for limit checks.
+     */
     public function __construct(?license_manager $license = null) {
         $this->license = $license ?? new license_manager();
     }
 
     // Sites.
 
+    /**
+     * Return all configured sites ordered by name.
+     *
+     * @return array
+     */
     public function get_sites(): array {
         global $DB;
         return $DB->get_records('local_inventario_sites', null, 'name ASC');
     }
 
+    /**
+     * Create or update a site record.
+     *
+     * @param stdClass $data
+     * @return int New or updated site id.
+     * @throws moodle_exception
+     */
     public function save_site(stdClass $data): int {
         global $DB;
         require_capability('local/inventario:managesites', context_system::instance());
@@ -68,6 +86,12 @@ class inventory_service {
         return $DB->insert_record('local_inventario_sites', $record);
     }
 
+    /**
+     * Delete a site if no objects are still linked to it.
+     *
+     * @param int $id
+     * @throws moodle_exception
+     */
     public function delete_site(int $id): void {
         global $DB;
         require_capability('local/inventario:managesites', context_system::instance());
@@ -78,6 +102,13 @@ class inventory_service {
     }
 
     // Object types helper.
+
+    /**
+     * Get the properties configuration for the given type.
+     *
+     * @param int $typeid
+     * @return array
+     */
     public function get_type_properties(int $typeid): array {
         $typeservice = new type_service();
         return $typeservice->get_type_properties($typeid);
@@ -85,6 +116,14 @@ class inventory_service {
 
     // Objects.
 
+    /**
+     * Fetch objects with optional filters.
+     *
+     * @param bool $includehidden
+     * @param int|null $siteid
+     * @param bool $onlyavailable
+     * @return array
+     */
     public function get_objects(bool $includehidden, ?int $siteid = null, bool $onlyavailable = false): array {
         global $DB;
         $params = [];
@@ -107,6 +146,14 @@ class inventory_service {
         return $DB->get_records_sql($sql, $params);
     }
 
+    /**
+     * Create or update an object.
+     *
+     * @param stdClass $data
+     * @param int $userid
+     * @return int Object id.
+     * @throws moodle_exception
+     */
     public function save_object(stdClass $data, int $userid): int {
         global $DB;
         require_capability('local/inventario:manageobjects', context_system::instance());
@@ -117,6 +164,20 @@ class inventory_service {
             $this->license->enforce_limit($count, 'objects');
         }
 
+        $availableenabled = $this->license->is_feature_enabled('availability') && !empty($data->availableperiodenabled);
+        $availablefrom = $availableenabled ? (int)($data->availablefrom ?? 0) : 0;
+        $availableto = $availableenabled ? (int)($data->availableto ?? 0) : 0;
+        $availableslotsraw = $availableenabled ? (string)($data->availabletimes ?? '') : '';
+        $availableslots = $availableenabled ? $this->parse_time_slots($availableslotsraw) : [];
+        if ($availableenabled) {
+            if ($availablefrom <= 0 || $availableto <= 0 || $availableto <= $availablefrom) {
+                throw new moodle_exception('availabilityerror_range', 'local_inventario');
+            }
+            if ($availableslots === false) {
+                throw new moodle_exception('availabilityerror_format', 'local_inventario');
+            }
+        }
+
         $record = (object)[
             'name' => trim($data->name ?? ''),
             'description' => $data->description ?? '',
@@ -124,6 +185,10 @@ class inventory_service {
             'siteid' => (int)($data->siteid ?? 0),
             'status' => $data->status ?? 'available',
             'visible' => isset($data->visible) ? (int)$data->visible : 1,
+            'availableperiodenabled' => $availableenabled ? 1 : 0,
+            'availablefrom' => $availableenabled ? $availablefrom : 0,
+            'availableto' => $availableenabled ? $availableto : 0,
+            'availabletimes' => $availableenabled ? trim($availableslotsraw) : '',
             'timemodified' => $now,
         ];
 
@@ -148,6 +213,11 @@ class inventory_service {
         return $DB->insert_record('local_inventario_objects', $record);
     }
 
+    /**
+     * Permanently delete an object and related data.
+     *
+     * @param int $id
+     */
     public function delete_object(int $id): void {
         global $DB;
         require_capability('local/inventario:manageobjects', context_system::instance());
@@ -156,6 +226,12 @@ class inventory_service {
         $DB->delete_records('local_inventario_objects', ['id' => $id]);
     }
 
+    /**
+     * Toggle visibility of an object.
+     *
+     * @param int $objectid
+     * @param bool $visible
+     */
     public function toggle_visibility(int $objectid, bool $visible): void {
         global $DB;
         require_capability('local/inventario:togglevisibility', context_system::instance());
@@ -168,15 +244,32 @@ class inventory_service {
 
     // Properties.
 
+    /**
+     * Get all properties ordered by parent and sort order.
+     *
+     * @return array
+     */
     public function get_properties(): array {
         global $DB;
         return $DB->get_records('local_inventario_properties', null, 'parentid ASC, sortorder ASC, name ASC');
     }
 
+    /**
+     * Return properties indexed by id.
+     *
+     * @return array
+     */
     private function get_properties_indexed(): array {
         return $this->get_properties();
     }
 
+    /**
+     * Create or update a property.
+     *
+     * @param stdClass $data
+     * @return int Property id.
+     * @throws moodle_exception
+     */
     public function save_property(stdClass $data): int {
         global $DB;
         require_capability('local/inventario:manageproperties', context_system::instance());
@@ -211,6 +304,12 @@ class inventory_service {
         return $DB->insert_record('local_inventario_properties', $record);
     }
 
+    /**
+     * Delete a property and its associations.
+     *
+     * @param int $id
+     * @throws moodle_exception
+     */
     public function delete_property(int $id): void {
         global $DB;
         require_capability('local/inventario:manageproperties', context_system::instance());
@@ -220,10 +319,12 @@ class inventory_service {
         }
 
         // Clean orphan values (oggetti eliminati).
-        $DB->execute("DELETE FROM {local_inventario_propvals}
+        $DB->execute(
+            "DELETE FROM {local_inventario_propvals}
                        WHERE propertyid = :pid
                          AND objectid NOT IN (SELECT id FROM {local_inventario_objects})",
-            ['pid' => $id]);
+            ['pid' => $id]
+        );
 
         // Block if still in use by existing objects.
         $inuse = $DB->record_exists_sql(
@@ -242,6 +343,12 @@ class inventory_service {
         $DB->delete_records('local_inventario_properties', ['id' => $id]);
     }
 
+    /**
+     * Return all property values for a given object keyed by property id.
+     *
+     * @param int $objectid
+     * @return array
+     */
     public function get_property_values(int $objectid): array {
         global $DB;
         $values = [];
@@ -252,6 +359,13 @@ class inventory_service {
         return $values;
     }
 
+    /**
+     * Persist property values for an object.
+     *
+     * @param int $objectid
+     * @param array $values
+     * @throws moodle_exception
+     */
     public function save_property_values(int $objectid, array $values): void {
         global $DB;
         require_capability('local/inventario:manageobjects', context_system::instance());
@@ -312,7 +426,7 @@ class inventory_service {
         }
         return [
             'user' => fullname($rec),
-            'period' => userdate($rec->timestart) . ' â†’ ' . userdate($rec->timeend),
+            'period' => userdate($rec->timestart) . ' to ' . userdate($rec->timeend),
             'status' => $status,
         ];
     }
@@ -324,15 +438,26 @@ class inventory_service {
      */
     public function get_unreturned_object_ids(): array {
         global $DB;
-        $sql = "SELECT DISTINCT objectid
-                  FROM {local_inventario_reserv}
-                 WHERE status = 'active' AND timeend < :now";
+        $sql = "SELECT DISTINCT r.objectid
+                  FROM {local_inventario_reserv} r
+                  JOIN {local_inventario_objects} o ON o.id = r.objectid
+             LEFT JOIN {local_inventario_types} t ON t.id = o.typeid
+                 WHERE r.status = 'active' AND r.timeend < :now AND COALESCE(t.requiresreturn, 1) = 1";
         $ids = $DB->get_records_sql($sql, ['now' => time()]);
         return array_map(static fn($rec) => (int)$rec->objectid, $ids);
     }
 
     // Reservations.
 
+    /**
+     * Create or update a reservation, validating overlaps and permissions.
+     *
+     * @param stdClass $data Reservation payload.
+     * @param int $userid Acting user id.
+     * @param bool $canmanageall Whether the user can manage all reservations.
+     * @return int Reservation id (first id for periodic reservations).
+     * @throws moodle_exception
+     */
     public function save_reservation(stdClass $data, int $userid, bool $canmanageall): int {
         global $DB;
 
@@ -340,6 +465,17 @@ class inventory_service {
         if (!$object->visible && !$canmanageall) {
             throw new moodle_exception('hiddenobject', 'local_inventario');
         }
+        $type = $DB->get_record('local_inventario_types', ['id' => $object->typeid]);
+        $requireslocation = $type && property_exists($type, 'requireslocation')
+            ? (int)$type->requireslocation
+            : 1;
+        $cleanlocation = trim((string)($data->location ?? ''));
+        if (!$requireslocation) {
+            $cleanlocation = '';
+        } else if ($cleanlocation === '') {
+            throw new moodle_exception('locationrequiredbytype', 'local_inventario');
+        }
+        $this->enforce_availability($object, (int)$data->timestart, (int)$data->timeend);
 
         $timestart = (int)$data->timestart;
         $timeend = (int)$data->timeend;
@@ -361,7 +497,7 @@ class inventory_service {
         $repeatdays = max(1, (int)($data->repeatdays ?? 1));
         if ($isperiodic) {
             $allowperiodic = (bool)get_config('local_inventario', 'allowperiodic');
-            if (!$allowperiodic || !$this->license->is_pro()) {
+            if (!$allowperiodic || !$this->license->is_feature_enabled('periodic')) {
                 throw new moodle_exception('periodicnotallowed', 'local_inventario');
             }
             // Limits come from the signed backend response.
@@ -377,28 +513,37 @@ class inventory_service {
 
         if ($isperiodic) {
             $firstid = null;
+            $firstreservation = null;
             for ($i = 0; $i < $repeatcount; $i++) {
                 $offset = $i * 86400 * $repeatdays;
                 $ts = $timestart + $offset;
                 $te = $timeend + $offset;
                 $this->enforce_overlap($object->id, $ts, $te, 0);
+                $this->enforce_availability($object, $ts, $te);
                 $rec = (object)[
                     'objectid' => $object->id,
                     'userid' => $useridtarget,
                     'siteid' => (int)($data->siteid ?: $object->siteid),
                     'timestart' => $ts,
                     'timeend' => $te,
-                    'location' => $data->location ?? '',
+                    'location' => $cleanlocation,
                     'status' => $data->status ?? 'active',
                     'timecreated' => time(),
                     'timemodified' => time(),
                 ];
                 $newid = $DB->insert_record('local_inventario_reserv', $rec);
+                if ($firstreservation === null) {
+                    $rec->id = $newid;
+                    $firstreservation = $rec;
+                }
                 if ($firstid === null) {
                     $firstid = $newid;
                 }
             }
             $this->mark_object_reserved($object->id);
+            if ($firstreservation) {
+                $this->send_reservation_confirmation($firstreservation, $object, $useridtarget);
+            }
             return $firstid ?? 0;
         }
 
@@ -408,13 +553,14 @@ class inventory_service {
             'siteid' => (int)($data->siteid ?: $object->siteid),
             'timestart' => $timestart,
             'timeend' => $timeend,
-            'location' => $data->location ?? '',
+            'location' => $cleanlocation,
             'status' => $data->status ?? 'active',
             'timemodified' => time(),
         ];
 
         if (!empty($data->id)) {
             $record->id = (int)$data->id;
+            $this->enforce_availability($object, $timestart, $timeend);
             $this->enforce_overlap($object->id, $timestart, $timeend, $record->id);
             $DB->update_record('local_inventario_reserv', $record);
             $this->mark_object_reserved($object->id);
@@ -423,10 +569,20 @@ class inventory_service {
 
         $record->timecreated = time();
         $reservationid = $DB->insert_record('local_inventario_reserv', $record);
+        $record->id = $reservationid;
         $this->mark_object_reserved($object->id);
+        $this->send_reservation_confirmation($record, $object, $useridtarget);
         return $reservationid;
     }
 
+    /**
+     * Remove a reservation (mark as returned) if it is still active.
+     *
+     * @param int $id
+     * @param int $userid
+     * @param bool $canmanageall
+     * @throws moodle_exception
+     */
     public function delete_reservation(int $id, int $userid, bool $canmanageall): void {
         $reservation = $this->get_reservation_for_user($id, $userid, $canmanageall);
         if ($reservation->timeend <= time()) {
@@ -449,6 +605,13 @@ class inventory_service {
         $this->mark_reservation_returned($reservation);
     }
 
+    /**
+     * Fetch reservations applying optional filters.
+     *
+     * @param array $filters
+     * @param bool $includehidden
+     * @return array
+     */
     public function get_reservations(array $filters, bool $includehidden): array {
         global $DB;
 
@@ -507,10 +670,20 @@ class inventory_service {
             }
         }
 
+        static $hasrequireslocation = null;
+        if ($hasrequireslocation === null) {
+            $dbman = $DB->get_manager();
+            $hasrequireslocation = $dbman->field_exists(
+                new \xmldb_table('local_inventario_types'),
+                new \xmldb_field('requireslocation')
+            );
+        }
+        $requireslocationselect = $hasrequireslocation ? 't.requireslocation' : '1 AS requireslocation';
+
         $sql = "SELECT r.*,
                        u.firstname, u.lastname, u.middlename, u.alternatename, u.firstnamephonetic, u.lastnamephonetic,
                        o.name AS objectname, s.name AS sitename, o.typeid,
-                       t.name AS typename, t.color AS typecolor
+                       t.name AS typename, t.color AS typecolor, t.requiresreturn, {$requireslocationselect}
                   FROM {local_inventario_reserv} r
                   JOIN {local_inventario_objects} o ON o.id = r.objectid
                   JOIN {user} u ON u.id = r.userid
@@ -527,6 +700,12 @@ class inventory_service {
         return $DB->get_records_sql($sql, $params);
     }
 
+    /**
+     * Produce usage statistics for objects and reservations.
+     *
+     * @param bool $includehidden
+     * @return array
+     */
     public function get_stats(bool $includehidden): array {
         global $DB;
 
@@ -692,7 +871,7 @@ class inventory_service {
         $required = ['name', 'type', 'site'];
         $aliases = [
             'type' => ['type', 'datatype'], // Accept legacy "datatype" header.
-            'site' => ['site', 'sede'],     // Accept localized column name.
+            'site' => ['site', 'sede'], // Accept localized column name.
         ];
         foreach ($required as $req) {
             $candidates = $aliases[$req] ?? [$req];
@@ -803,6 +982,11 @@ class inventory_service {
         return $semicoloncount > $commacount ? 'semicolon' : 'comma';
     }
 
+    /**
+     * Set object status to reserved.
+     *
+     * @param int $objectid
+     */
     private function mark_object_reserved(int $objectid): void {
         global $DB;
         if ($object = $DB->get_record('local_inventario_objects', ['id' => $objectid])) {
@@ -812,6 +996,11 @@ class inventory_service {
         }
     }
 
+    /**
+     * Set object status back to available if there are no active reservations.
+     *
+     * @param int $objectid
+     */
     private function mark_object_available(int $objectid): void {
         global $DB;
         $hasactive = $DB->record_exists('local_inventario_reserv', ['objectid' => $objectid, 'status' => 'active']);
@@ -836,9 +1025,11 @@ class inventory_service {
             'nowstart' => time(),
             'nowend' => time(),
         ];
-        return $DB->record_exists_select('local_inventario_reserv',
+        return $DB->record_exists_select(
+            'local_inventario_reserv',
             'objectid = :objectid AND status = :status AND timestart <= :nowstart AND timeend > :nowend',
-            $params);
+            $params
+        );
     }
 
     /**
@@ -854,16 +1045,34 @@ class inventory_service {
             'status' => 'active',
             'now' => time(),
         ];
-        return $DB->count_records_select('local_inventario_reserv',
-            'objectid = :objectid AND status = :status AND timeend < :now',
-            $params);
+        $sql = "SELECT COUNT(1)
+                  FROM {local_inventario_reserv} r
+                  JOIN {local_inventario_objects} o ON o.id = r.objectid
+             LEFT JOIN {local_inventario_types} t ON t.id = o.typeid
+                 WHERE r.objectid = :objectid
+                   AND r.status = :status
+                   AND r.timeend < :now
+                   AND COALESCE(t.requiresreturn, 1) = 1";
+        return (int)$DB->count_records_sql($sql, $params);
     }
 
+    /**
+     * Ensure the requested period does not overlap existing reservations.
+     *
+     * @param int $objectid
+     * @param int $timestart
+     * @param int $timeend
+     * @param int $excludeid
+     * @throws moodle_exception
+     */
     private function enforce_overlap(int $objectid, int $timestart, int $timeend, int $excludeid = 0): void {
         global $DB;
-        $overlap = $DB->record_exists_select('local_inventario_reserv',
+        $overlap = $DB->record_exists_select(
+            'local_inventario_reserv',
             'objectid = :objectid AND status = :status AND id <> :id AND ' .
-            '((timestart <= :ts_a AND timeend > :ts_b) OR (timestart < :te_a AND timeend >= :te_b) OR (:ts_c <= timestart AND :te_c >= timeend))',
+            '((timestart <= :ts_a AND timeend > :ts_b) OR ' .
+            '(timestart < :te_a AND timeend >= :te_b) OR ' .
+            '(:ts_c <= timestart AND :te_c >= timeend))',
             [
                 'objectid' => $objectid,
                 'status' => 'active',
@@ -874,7 +1083,8 @@ class inventory_service {
                 'te_b' => $timeend,
                 'ts_c' => $timestart,
                 'te_c' => $timeend,
-            ]);
+            ]
+        );
 
         if ($overlap) {
             throw new moodle_exception('overlap', 'local_inventario');
@@ -934,5 +1144,180 @@ class inventory_service {
 
         $this->mark_object_available($reservation->objectid);
     }
-}
 
+    /**
+     * Send reservation confirmation email to the user.
+     *
+     * @param stdClass $reservation
+     * @param stdClass $object
+     * @param int $userid
+     */
+    private function send_reservation_confirmation(stdClass $reservation, stdClass $object, int $userid): void {
+        global $DB, $CFG;
+
+        $user = $DB->get_record('user', ['id' => $userid, 'deleted' => 0, 'suspended' => 0], '*', IGNORE_MISSING);
+        if (!$user) {
+            return;
+        }
+
+        $type = $object->typeid ? $DB->get_record('local_inventario_types', ['id' => $object->typeid]) : null;
+        $site = $DB->get_record('local_inventario_sites', ['id' => $object->siteid], '*', IGNORE_MISSING);
+
+        $typeprops = $type ? (new type_service())->get_type_properties((int)$type->id) : [];
+        $propvaluesraw = $this->get_property_values((int)$object->id);
+
+        $propertylines = [];
+        foreach ($typeprops as $prop) {
+            $value = $propvaluesraw[$prop->id] ?? '';
+            if ($value === '' && $value !== '0') {
+                continue;
+            }
+            if ($value === '1') {
+                $value = get_string('yes');
+            } else if ($value === '0') {
+                $value = get_string('no');
+            }
+            $propertylines[] = format_string($prop->name) . ': ' . s($value);
+        }
+        $propertiestext = empty($propertylines)
+            ? get_string('nopropertiesassigned', 'local_inventario')
+            : '- ' . implode("\n- ", $propertylines);
+
+        $tokens = [
+            '{object}' => format_string($object->name),
+            '{type}' => $type ? format_string($type->name) : '',
+            '{site}' => $site ? format_string($site->name) : '',
+            '{location}' => $reservation->location ?? '',
+            '{start}' => userdate($reservation->timestart),
+            '{end}' => userdate($reservation->timeend),
+            '{properties}' => $propertiestext,
+            '{reservationurl}' => (new \moodle_url('/local/inventario/reservations.php', ['focus' => $reservation->id]))->out(false),
+            '{userfullname}' => fullname($user),
+        ];
+
+        $subjecttpl = (string)get_config('local_inventario', 'confirmation_subject_template');
+        $bodytpl = (string)get_config('local_inventario', 'confirmation_body_template');
+        if ($subjecttpl === '') {
+            $subjecttpl = get_string('reservationconfirmation_subject', 'local_inventario');
+        }
+        if ($bodytpl === '') {
+            $bodytpl = get_string('reservationconfirmation_body', 'local_inventario');
+        }
+
+        $subject = str_replace(array_keys($tokens), array_values($tokens), $subjecttpl);
+        $bodyraw = str_replace(array_keys($tokens), array_values($tokens), $bodytpl);
+        $bodyhtml = format_text($bodyraw, FORMAT_MARKDOWN);
+        require_once($CFG->libdir . '/weblib.php');
+        $bodyplain = html_to_text($bodyhtml);
+
+        $supportuser = core_user::get_support_user();
+        email_to_user($user, $supportuser, $subject, $bodyplain, $bodyhtml);
+    }
+
+    /**
+     * Tell if an object is currently available, considering Pro availability windows.
+     *
+     * @param stdClass $object
+     * @param int|null $time Timestamp to evaluate, defaults to now.
+     * @return bool
+     */
+    public function is_available_now(stdClass $object, ?int $time = null): bool {
+        $time = $time ?? time();
+        if (empty($object->availableperiodenabled)) {
+            return true;
+        }
+
+        $from = isset($object->availablefrom) ? (int)$object->availablefrom : 0;
+        $to = isset($object->availableto) ? (int)$object->availableto : 0;
+        if ($from > 0 && $time < $from) {
+            return false;
+        }
+        if ($to > 0 && $time > $to) {
+            return false;
+        }
+
+        $slots = $this->parse_time_slots((string)($object->availabletimes ?? ''));
+        if ($slots === false) {
+            return false;
+        }
+        if (empty($slots)) {
+            return true;
+        }
+
+        $minutes = ((int)userdate($time, '%H')) * 60 + (int)userdate($time, '%M');
+        foreach ($slots as $slot) {
+            if ($minutes >= $slot['start'] && $minutes <= $slot['end']) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Ensure a reservation falls within the object's availability window.
+     *
+     * @param stdClass $object
+     * @param int $timestart
+     * @param int $timeend
+     * @throws moodle_exception
+     */
+    private function enforce_availability(stdClass $object, int $timestart, int $timeend): void {
+        if (empty($object->availableperiodenabled)) {
+            return;
+        }
+        $from = isset($object->availablefrom) ? (int)$object->availablefrom : 0;
+        $to = isset($object->availableto) ? (int)$object->availableto : 0;
+        if ($from > 0 && $timestart < $from) {
+            throw new moodle_exception('availabilityerror_outofrange', 'local_inventario');
+        }
+        if ($to > 0 && $timeend > $to) {
+            throw new moodle_exception('availabilityerror_outofrange', 'local_inventario');
+        }
+        $slots = $this->parse_time_slots((string)($object->availabletimes ?? ''));
+        if (!empty($slots)) {
+            $startdate = userdate($timestart, '%Y-%m-%d');
+            $enddate = userdate($timeend, '%Y-%m-%d');
+            if ($startdate !== $enddate) {
+                throw new moodle_exception('availabilityerror_slotday', 'local_inventario');
+            }
+            $startmin = ((int)userdate($timestart, '%H')) * 60 + (int)userdate($timestart, '%M');
+            $endmin = ((int)userdate($timeend, '%H')) * 60 + (int)userdate($timeend, '%M');
+            $inside = false;
+            foreach ($slots as $slot) {
+                if ($startmin >= $slot['start'] && $endmin <= $slot['end']) {
+                    $inside = true;
+                    break;
+                }
+            }
+            if (!$inside) {
+                throw new moodle_exception('availabilityerror_slot', 'local_inventario');
+            }
+        }
+    }
+
+    /**
+     * Parse availability slots from raw text.
+     *
+     * @param string $raw
+     * @return array<int,array{start:int,end:int}>|false
+     */
+    private function parse_time_slots(string $raw) {
+        $lines = array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $raw)));
+        if (empty($lines)) {
+            return [];
+        }
+        $slots = [];
+        foreach ($lines as $line) {
+            if (!preg_match('/^([0-2][0-9]):([0-5][0-9])\-([0-2][0-9]):([0-5][0-9])$/', $line, $m)) {
+                return false;
+            }
+            $start = ((int)$m[1]) * 60 + (int)$m[2];
+            $end = ((int)$m[3]) * 60 + (int)$m[4];
+            if ($end <= $start) {
+                return false;
+            }
+            $slots[] = ['start' => $start, 'end' => $end];
+        }
+        return $slots;
+    }
+}

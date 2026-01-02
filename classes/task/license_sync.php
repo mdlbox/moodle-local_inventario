@@ -22,13 +22,25 @@ require_once($CFG->dirroot . '/local/inventario/locallib.php');
 
 /**
  * Scheduled task to sync license and ping installation.
+ *
+ * @package   local_inventario
+ * @copyright 2025 mdlbox - https://app.mdlbox.com
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class license_sync extends \core\task\scheduled_task {
-    public function get_name() {
+    /**
+     * Task name shown in admin UI.
+     *
+     * @return string
+     */
+    public function get_name(): string {
         return get_string('license', 'local_inventario');
     }
 
-    public function execute() {
+    /**
+     * Execute the task and refresh license status.
+     */
+    public function execute(): void {
         $license = local_inventario_license();
         // Force refresh to validate API key and update status (Pro/Free).
         $license->refresh(true);

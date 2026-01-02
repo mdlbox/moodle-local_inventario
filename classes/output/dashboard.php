@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -28,18 +28,29 @@ use renderable;
 use renderer_base;
 use templatable;
 
-defined('MOODLE_INTERNAL') || die();
-
-
+/**
+ * Renderable dashboard DTO.
+ */
 class dashboard implements renderable, templatable {
+    /** @var array Raw dashboard data */
     private $data;
 
+    /**
+     * Dashboard constructor.
+     *
+     * @param array $data
+     */
     public function __construct(array $data) {
         $this->data = $data;
     }
 
+    /**
+     * Export data for mustache templates.
+     *
+     * @param renderer_base $output
+     * @return array
+     */
     public function export_for_template(renderer_base $output): array {
         return $this->data;
     }
 }
-

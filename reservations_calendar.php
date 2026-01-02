@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -31,7 +31,7 @@ require_capability('local/inventario:reserve', $context);
 
 $license = local_inventario_license()->refresh();
 if ($license->status !== 'pro' || empty($license->apikey)) {
-    print_error('prorequired', 'local_inventario');
+    throw new moodle_exception('prorequired', 'local_inventario');
 }
 
 $month = optional_param('month', (int)date('n'), PARAM_INT);
@@ -40,7 +40,6 @@ $siteid = optional_param('siteid', 0, PARAM_INT);
 $typeid = optional_param('typeid', 0, PARAM_INT);
 $objectid = optional_param('objectid', 0, PARAM_INT);
 $userid = optional_param('userid', 0, PARAM_INT);
-$usersearch = optional_param('usersearch', '', PARAM_TEXT);
 $todayinfo = usergetdate(time());
 
 $month = max(1, min(12, $month));
@@ -55,7 +54,6 @@ $PAGE->set_url('/local/inventario/reservations_calendar.php', [
     'typeid' => $typeid,
     'objectid' => $objectid,
     'userid' => $userid,
-    'usersearch' => $usersearch,
 ]);
 $PAGE->set_context($context);
 $PAGE->set_title(get_string('reservationscalendar', 'local_inventario'));
@@ -79,20 +77,12 @@ foreach ($service->get_objects($includehidden, $siteid ?: null) as $object) {
 $useroptions = [];
 $userselectoptions = [];
 if ($canmanageall) {
-    $allusers = get_users_by_capability($context, 'local/inventario:reserve',
-        'u.id, u.firstname, u.lastname, u.firstnamephonetic, u.lastnamephonetic, u.middlename, u.alternatename');
-    $needle = core_text::strtolower(trim($usersearch));
-    $filtered = [];
-    foreach ($allusers as $u) {
-        if ($needle !== '') {
-            $haystack = core_text::strtolower(trim($u->lastname . ' ' . $u->firstname));
-            if (strpos($haystack, $needle) === false) {
-                continue;
-            }
-        }
-        $filtered[] = $u;
-    }
-    usort($filtered, static function($a, $b) {
+    $allusers = get_users_by_capability(
+        $context,
+        'local/inventario:reserve',
+        'u.id, u.firstname, u.lastname, u.firstnamephonetic, u.lastnamephonetic, u.middlename, u.alternatename'
+    );
+    usort($allusers, static function ($a, $b) {
         $lcmp = strcasecmp($a->lastname, $b->lastname);
         if ($lcmp !== 0) {
             return $lcmp;
@@ -101,7 +91,7 @@ if ($canmanageall) {
     });
     $currentlabel = fullname($USER) . ' (' . get_string('you', 'moodle') . ')';
     $userselectoptions = [0 => get_string('all', 'local_inventario'), $USER->id => $currentlabel];
-    foreach ($filtered as $u) {
+    foreach ($allusers as $u) {
         if ($u->id == $USER->id) {
             continue;
         }
@@ -218,7 +208,6 @@ $baseparams = [
     'typeid' => $typeid,
     'objectid' => $objectid,
     'userid' => $userid,
-    'usersearch' => $usersearch,
 ];
 $prevurl = new moodle_url($PAGE->url, $baseparams + ['month' => $prevmonth, 'year' => $prevyear]);
 $nexturl = new moodle_url($PAGE->url, $baseparams + ['month' => $nextmonth, 'year' => $nextyear]);
@@ -233,15 +222,15 @@ $todayurl = new moodle_url($PAGE->url, $baseparams + [
     'year' => $todayinfo['year'],
 ]) . '#inventario-today';
 
-echo $OUTPUT->header();
-echo local_inventario_render_nav($context);
-
-echo html_writer::div(
-    html_writer::link($prevurl, '&lt;&lt;', ['class' => 'btn btn-outline-secondary btn-sm']) .
+$monthnav = html_writer::div(
+    html_writer::link($prevurl, '&lt;&lt;', ['class' => 'btn btn-secondary']) .
     html_writer::span($monthlabel, 'mx-3 fw-bold') .
-    html_writer::link($nexturl, '&gt;&gt;', ['class' => 'btn btn-outline-secondary btn-sm']),
+    html_writer::link($nexturl, '&gt;&gt;', ['class' => 'btn btn-secondary']),
     'd-flex align-items-center justify-content-center gap-3 mb-3 inventario-calendar-nav'
 );
+
+echo $OUTPUT->header();
+echo local_inventario_render_nav($context);
 
 echo html_writer::start_div('card mb-3 shadow-sm');
 echo html_writer::start_div('card-body');
@@ -267,11 +256,21 @@ echo html_writer::start_tag('table', [
 
 echo html_writer::start_tag('tr', ['class' => 'inventario-filter-row']);
 echo html_writer::tag('th', html_writer::label(get_string('month'), 'month'));
-echo html_writer::tag('td', html_writer::select($monthoptions, 'month', $month, null,
-    ['id' => 'month', 'class' => 'custom-select']));
+echo html_writer::tag('td', html_writer::select(
+    $monthoptions,
+    'month',
+    $month,
+    null,
+    ['id' => 'month', 'class' => 'custom-select']
+));
 echo html_writer::tag('th', html_writer::label(get_string('year'), 'year'));
-echo html_writer::tag('td', html_writer::select($yearoptions, 'year', $year, null,
-    ['id' => 'year', 'class' => 'custom-select']));
+echo html_writer::tag('td', html_writer::select(
+    $yearoptions,
+    'year',
+    $year,
+    null,
+    ['id' => 'year', 'class' => 'custom-select']
+));
 echo html_writer::end_tag('tr');
 
 echo html_writer::start_tag('tr', ['class' => 'inventario-filter-row']);
@@ -294,26 +293,25 @@ echo html_writer::tag('td', html_writer::select(
 echo html_writer::end_tag('tr');
 
 echo html_writer::start_tag('tr', ['class' => 'inventario-filter-row']);
-echo html_writer::tag('th', html_writer::label(get_string('usersearchbylastname', 'local_inventario'), 'usersearch'));
-echo html_writer::tag('td', html_writer::empty_tag('input', [
-    'type' => 'text',
-    'name' => 'usersearch',
-    'id' => 'usersearch',
-    'value' => s($usersearch),
-    'placeholder' => get_string('usersearchbylastname', 'local_inventario'),
-    'class' => 'form-control',
-]));
 echo html_writer::tag('th', html_writer::label(get_string('user'), 'userid'));
-echo html_writer::tag('td', html_writer::select(
+$usersearchbox = html_writer::empty_tag('input', [
+    'type' => 'text',
+    'id' => 'useridsearch',
+    'class' => 'form-control mb-2',
+    'placeholder' => get_string('search'),
+]);
+$userselect = html_writer::select(
     $userselectoptions,
     'userid',
     $userid,
     null,
-    ['id' => 'userid', 'class' => 'custom-select']
-));
-echo html_writer::end_tag('tr');
-
-echo html_writer::start_tag('tr', ['class' => 'inventario-filter-row']);
+    [
+        'id' => 'userid',
+        'class' => 'custom-select',
+        'data-users' => json_encode($userselectoptions),
+    ]
+);
+echo html_writer::tag('td', $usersearchbox . $userselect);
 echo html_writer::tag('th', html_writer::label(get_string('object', 'local_inventario'), 'objectid'));
 echo html_writer::tag('td', html_writer::select(
     [0 => get_string('all', 'local_inventario')] + $objectoptions,
@@ -321,7 +319,7 @@ echo html_writer::tag('td', html_writer::select(
     $objectid,
     null,
     ['id' => 'objectid', 'class' => 'custom-select']
-), ['colspan' => 3]);
+));
 echo html_writer::end_tag('tr');
 
 echo html_writer::start_tag('tr');
@@ -335,9 +333,12 @@ $reseturl = new moodle_url('/local/inventario/reservations_calendar.php', [
     'month' => $month,
     'year' => $year,
 ]);
-$submitcell .= html_writer::link($reseturl, get_string('resetfilters', 'local_inventario'),
-    ['class' => 'btn btn-secondary']);
-echo html_writer::tag('td', $submitcell, ['colspan' => 2]);
+$submitcell .= html_writer::link(
+    $reseturl,
+    get_string('resetfilters', 'local_inventario'),
+    ['class' => 'btn btn-secondary']
+);
+echo html_writer::tag('td', html_writer::div($submitcell, 'd-flex justify-content-end'), ['colspan' => 2]);
 echo html_writer::end_tag('tr');
 
 echo html_writer::end_tag('table');
@@ -362,9 +363,14 @@ $legendleft = html_writer::div(
 );
 echo html_writer::div(
     $legendleft .
-    html_writer::div(html_writer::link($todayurl, get_string('today'), ['class' => 'btn btn-outline-primary btn-sm ms-auto']), 'ms-auto'),
+    html_writer::div(
+        html_writer::link($todayurl, get_string('today'), ['class' => 'btn btn-secondary ms-auto']),
+        'ms-auto'
+    ),
     'inventario-calendar-legend d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3'
 );
+
+echo $monthnav;
 
 echo html_writer::start_tag('table', ['class' => 'generaltable inventario-calendar-table']);
 echo html_writer::start_tag('thead');
@@ -383,7 +389,9 @@ foreach ($weeks as $weekrow) {
             echo html_writer::tag('td', '&nbsp;', ['class' => 'inventario-calendar-cell muted']);
             continue;
         }
-        $istoday = ($year === (int)$todayinfo['year'] && $month === (int)$todayinfo['mon'] && $cell['day'] === (int)$todayinfo['mday']);
+        $istoday = ($year === (int)$todayinfo['year']
+            && $month === (int)$todayinfo['mon']
+            && $cell['day'] === (int)$todayinfo['mday']);
         $daycontent = html_writer::div($cell['day'], 'inventario-calendar-day text-muted');
         if (!empty($cell['events'])) {
             $eventblocks = [];
@@ -410,7 +418,7 @@ foreach ($weeks as $weekrow) {
                 $morelabel = get_string('calendarshowmore', 'local_inventario', $remaining);
                 $morebutton = html_writer::tag('button', $morelabel, [
                     'type' => 'button',
-                    'class' => 'btn btn-link btn-sm p-0 inventario-calendar-showmore',
+                    'class' => 'btn btn-secondary btn-sm inventario-calendar-showmore',
                     'data-label' => $morelabel,
                 ]);
                 $eventblocks[] = html_writer::div($morebutton, 'inventario-calendar-more');
@@ -455,7 +463,35 @@ $PAGE->requires->js_init_code("
         }
         btn.textContent = expanded ? '" . get_string('calendarshowless', 'local_inventario') . "' : btn.dataset.label;
     });
+    (function() {
+        var search = document.getElementById('useridsearch');
+        var select = document.getElementById('userid');
+        if (!search || !select) {
+            return;
+        }
+        var stored = select.dataset.users ? JSON.parse(select.dataset.users) : {};
+        var allOptions = Object.keys(stored).map(function(key) {
+            return {value: key, text: stored[key]};
+        });
+        function render(term) {
+            var needle = term.trim().toLowerCase();
+            var current = select.value;
+            while (select.options.length) {
+                select.remove(0);
+            }
+            allOptions.forEach(function(opt) {
+                if (needle && opt.text.toLowerCase().indexOf(needle) === -1) {
+                    return;
+                }
+                var option = new Option(opt.text, opt.value, false, opt.value === current);
+                select.add(option);
+            });
+        }
+        render(search.value);
+        search.addEventListener('input', function() {
+            render(search.value);
+        });
+    })();
 ");
 
 echo $OUTPUT->footer();
-

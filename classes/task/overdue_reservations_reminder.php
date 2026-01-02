@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -27,8 +27,9 @@ namespace local_inventario\task;
 use core\message\message;
 use core_user;
 
-defined('MOODLE_INTERNAL') || die();
-
+/**
+ * Scheduled task to remind users of overdue reservations.
+ */
 class overdue_reservations_reminder extends \core\task\scheduled_task {
     /**
      * Task name.
@@ -56,7 +57,8 @@ class overdue_reservations_reminder extends \core\task\scheduled_task {
                   FROM {local_inventario_reserv} r
                   JOIN {user} u ON u.id = r.userid
              LEFT JOIN {local_inventario_objects} o ON o.id = r.objectid
-                 WHERE r.status = 'active' AND r.timeend < :threshold";
+             LEFT JOIN {local_inventario_types} t ON t.id = o.typeid
+                 WHERE r.status = 'active' AND r.timeend < :threshold AND COALESCE(t.requiresreturn, 1) = 1";
         $reservations = $DB->get_records_sql($sql, ['threshold' => $threshold]);
 
         if (empty($reservations)) {
@@ -76,12 +78,28 @@ class overdue_reservations_reminder extends \core\task\scheduled_task {
             $enddate = userdate($reservation->timeend);
 
             $link = new \moodle_url('/local/inventario/reservations.php', ['focus' => $reservation->id]);
-            $subject = $sm->get_string('reservationoverduesubject', 'local_inventario', $objectname, $lang);
-            $body = $sm->get_string('reservationoverduebody', 'local_inventario', (object)[
+            $link->set_anchor('reservation-' . $reservation->id);
+
+            $defaultsubject = $sm->get_string('reservationoverduesubject', 'local_inventario', '{object}', $lang);
+            $defaultbody = $sm->get_string('reservationoverduebody', 'local_inventario', (object)[
+                'object' => '{object}',
+                'end' => '{end}',
+                'link' => '{reservationurl}',
+            ], $lang);
+
+            $subjecttpl = $this->get_template('overdue_subject_template', $defaultsubject);
+            $bodytpl = $this->get_template('overdue_body_template', $defaultbody);
+
+            $replacements = [
                 'object' => $objectname,
                 'end' => $enddate,
-                'link' => $link->out(false),
-            ], $lang);
+                'reservationurl' => $link->out(false),
+                'returnurl' => $link->out(false),
+                'userfullname' => fullname($user),
+            ];
+
+            $subject = $this->replace_tokens($subjecttpl, $replacements);
+            $body = $this->replace_tokens($bodytpl, $replacements);
 
             $eventdata = new message();
             $eventdata->component = 'local_inventario';
@@ -100,9 +118,42 @@ class overdue_reservations_reminder extends \core\task\scheduled_task {
             $sent = message_send($eventdata);
 
             if (empty($sent)) {
-                email_to_user($user, core_user::get_noreply_user(), $subject, $body, $eventdata->fullmessagehtml, $eventdata->contexturl);
+                email_to_user(
+                    $user,
+                    core_user::get_noreply_user(),
+                    $subject,
+                    $body,
+                    $eventdata->fullmessagehtml,
+                    $eventdata->contexturl
+                );
             }
         }
     }
-}
 
+    /**
+     * Replace supported placeholders inside a template string.
+     *
+     * @param string $template
+     * @param array $values
+     * @return string
+     */
+    private function replace_tokens(string $template, array $values): string {
+        $replacements = [];
+        foreach ($values as $key => $value) {
+            $replacements['{' . $key . '}'] = $value;
+        }
+        return strtr($template, $replacements);
+    }
+
+    /**
+     * Resolve configured template or fall back to the provided default.
+     *
+     * @param string $configname
+     * @param string $default
+     * @return string
+     */
+    private function get_template(string $configname, string $default): string {
+        $value = (string)get_config('local_inventario', $configname);
+        return $value !== '' ? $value : $default;
+    }
+}

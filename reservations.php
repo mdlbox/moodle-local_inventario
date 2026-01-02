@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -49,20 +49,21 @@ $pageparams = [
     'resperpage' => $resperpage,
     'focus' => $focus ?: null,
 ];
-$pageparams = array_filter($pageparams, static function($value) {
+$pageparams = array_filter($pageparams, static function ($value) {
     return $value !== null && $value !== '';
 });
 $PAGE->set_url('/local/inventario/reservations.php', $pageparams);
 $PAGE->set_context($context);
 $PAGE->set_title(get_string('reservations', 'local_inventario'));
 $PAGE->set_heading(get_string('reservations', 'local_inventario'));
+$PAGE->requires->css('/local/inventario/styles.css');
 
 $canmanageall = has_capability('local/inventario:deletereservations', $context);
 $includehidden = local_inventario_can_see_hidden();
 $service = local_inventario_service();
 
 // Periodic reservations allowed only if setting and Pro.
-$allowperiodic = (bool)get_config('local_inventario', 'allowperiodic') && $license->status === 'pro';
+$allowperiodic = (bool)get_config('local_inventario', 'allowperiodic') && local_inventario_feature_enabled('periodic');
 $overlaperror = '';
 $expiredwarning = '';
 
@@ -86,7 +87,7 @@ $record = null;
 if ($id) {
     $record = $DB->get_record('local_inventario_reserv', ['id' => $id], '*', MUST_EXIST);
     if (!$canmanageall && $record->userid != $USER->id) {
-        print_error('notyours', 'local_inventario');
+        throw new moodle_exception('notyours', 'local_inventario');
     }
     if ($record->timeend <= time()) {
         $expiredwarning = get_string('cannoteditexpiredreservation', 'local_inventario');
@@ -99,7 +100,7 @@ if ($id) {
         if ($selectedsite) {
             $pageparams['siteid'] = $selectedsite;
         }
-        $pageparams = array_filter($pageparams, static function($value) {
+        $pageparams = array_filter($pageparams, static function ($value) {
             return $value !== null && $value !== '';
         });
         $PAGE->set_url('/local/inventario/reservations.php', $pageparams);
@@ -117,10 +118,19 @@ if (!$selectedsite && !empty($siteoptions)) {
 }
 
 $objectoptions = [];
+$objectmetadata = [];
+$typesbyid = local_inventario_typeservice()->get_types();
 if ($selectedsite) {
     $objs = $service->get_objects($includehidden, $selectedsite);
     foreach ($objs as $obj) {
         $objectoptions[$obj->id] = format_string($obj->name);
+        $type = $typesbyid[$obj->typeid] ?? null;
+        $objectmetadata[$obj->id] = [
+            'typeid' => (int)$obj->typeid,
+            'requireslocation' => $type && property_exists($type, 'requireslocation')
+                ? (int)$type->requireslocation
+                : 1,
+        ];
     }
 }
 $unreturnedids = array_values(array_intersect(
@@ -129,11 +139,20 @@ $unreturnedids = array_values(array_intersect(
 ));
 $useroptions = $canmanageall ? local_inventario_user_options() : [];
 
-$form = new local_inventario_reservation_form($PAGE->url->out(false), $objectoptions, $siteoptions, $useroptions, $canmanageall, $allowperiodic);
+$form = new local_inventario_reservation_form(
+    $PAGE->url->out(false),
+    $objectoptions,
+    $siteoptions,
+    $useroptions,
+    $canmanageall,
+    $allowperiodic,
+    $objectmetadata
+);
 $PAGE->requires->js_call_amd('local_inventario/reservations', 'init', [
     $PAGE->url->out(false),
     $id,
     $unreturnedids,
+    $objectmetadata,
 ]);
 
 if ($form->is_cancelled()) {
@@ -185,6 +204,10 @@ foreach ($reservations as $rescheck) {
     if ($rescheck->status === 'returned') {
         continue;
     }
+    $requiresreturn = isset($rescheck->requiresreturn) ? (int)$rescheck->requiresreturn : 1;
+    if (!$requiresreturn) {
+        continue;
+    }
     $objid = $rescheck->objectid;
     $current = $returncandidates[$objid] ?? null;
     $isactive = ($rescheck->timestart <= $now && $rescheck->timeend > $now);
@@ -225,7 +248,8 @@ if ($expiredwarning !== '') {
 // Inline warning toggled via JS when selecting objects not yet returned.
 echo html_writer::div(
     get_string('unreturnednotice', 'local_inventario'),
-    'alert alert-warning local-inventario-unreturned-warning' . ($selectedobject && in_array($selectedobject, $unreturnedids) ? '' : ' hidden')
+    'alert alert-warning local-inventario-unreturned-warning' .
+        ($selectedobject && in_array($selectedobject, $unreturnedids) ? '' : ' hidden')
 );
 
 if ($hasactivereservationnow) {
@@ -248,12 +272,38 @@ foreach ($allowedperpage as $val) {
     }
     $perpageoptionshtml .= html_writer::tag('option', $label, $attrs);
 }
-$perpageform = html_writer::tag('form',
-    (($selectedsite ?? 0) ? html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'siteid', 'value' => $selectedsite]) : '') .
-    (($objectidparam ?? 0) ? html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'objectid', 'value' => $objectidparam]) : '') .
+$formhidden = '';
+if (!empty($selectedsite)) {
+    $formhidden .= html_writer::empty_tag('input', [
+        'type' => 'hidden',
+        'name' => 'siteid',
+        'value' => $selectedsite,
+    ]);
+}
+if (!empty($objectidparam)) {
+    $formhidden .= html_writer::empty_tag('input', [
+        'type' => 'hidden',
+        'name' => 'objectid',
+        'value' => $objectidparam,
+    ]);
+}
+
+$perpageformcontent = $formhidden .
     html_writer::label(get_string('itemsperpage', 'local_inventario'), 'resperpage', ['class' => 'mb-0 me-2']) .
-    html_writer::tag('select', $perpageoptionshtml, ['name' => 'resperpage', 'id' => 'resperpage', 'class' => 'custom-select w-auto me-2']) .
-    html_writer::empty_tag('input', ['type' => 'submit', 'class' => 'btn btn-primary btn-sm', 'value' => get_string('apply', 'moodle')]),
+    html_writer::tag('select', $perpageoptionshtml, [
+        'name' => 'resperpage',
+        'id' => 'resperpage',
+        'class' => 'custom-select w-auto me-2',
+    ]) .
+    html_writer::empty_tag('input', [
+        'type' => 'submit',
+        'class' => 'btn btn-secondary',
+        'value' => get_string('apply', 'moodle'),
+    ]);
+
+$perpageform = html_writer::tag(
+    'form',
+    $perpageformcontent,
     ['method' => 'get', 'class' => 'd-flex justify-content-end align-items-center gap-2 mb-2 flex-wrap']
 );
 echo $perpageform;
@@ -277,6 +327,7 @@ foreach ($reservations as $reservation) {
     $isreturned = $reservation->status === 'returned';
     $isreturncandidate = isset($returncandidates[$reservation->objectid]) &&
         (int)$returncandidates[$reservation->objectid]['id'] === (int)$reservation->id;
+    $requiresreturn = isset($reservation->requiresreturn) ? (int)$reservation->requiresreturn : 1;
     // Collect rows for later ordering: active/upcoming first, then expired.
     $actions = [];
     if ($canmanageall || $reservation->userid == $USER->id) {
@@ -290,6 +341,7 @@ foreach ($reservations as $reservation) {
             'title' => get_string('returnobject', 'local_inventario'),
             'aria-hidden' => 'true',
         ]);
+        $noreturntooltip = get_string('noreturnrequiredtooltip', 'local_inventario');
 
         // Edit.
         if ($expired) {
@@ -301,20 +353,33 @@ foreach ($reservations as $reservation) {
             );
         }
 
-        // Return.
-        $shouldreturn = ($expired && !$isreturned && $isreturncandidate);
-        if ($shouldreturn) {
-            $returnurl = new moodle_url($PAGE->url, ['return' => $reservation->id, 'sesskey' => sesskey()]);
-            $actions[] = html_writer::link(
-                $returnurl,
-                $returniconenabled,
+        // Return (only for types that require it).
+        if ($requiresreturn) {
+            $shouldreturn = ($expired && !$isreturned && $isreturncandidate);
+            if ($shouldreturn) {
+                $returnurl = new moodle_url($PAGE->url, ['return' => $reservation->id, 'sesskey' => sesskey()]);
+                $actions[] = html_writer::link(
+                    $returnurl,
+                    $returniconenabled,
+                    [
+                        'title' => get_string('returnobject', 'local_inventario'),
+                        'onclick' => "return confirm('" . get_string('confirmreturn', 'local_inventario') . "');",
+                    ]
+                );
+            } else {
+                $actions[] = html_writer::span($returnicondisabled, 'text-muted');
+            }
+        } else {
+            $actions[] = html_writer::span(
+                html_writer::span('', 'fa-solid fa-arrow-right-to-city fa-stack-1x text-muted', ['aria-hidden' => 'true']) .
+                html_writer::span('', 'fa-solid fa-ban fa-stack-2x text-danger', ['aria-hidden' => 'true']),
+                'fa-stack fa-sm align-middle',
                 [
-                    'title' => get_string('returnobject', 'local_inventario'),
-                    'onclick' => "return confirm('" . get_string('confirmreturn', 'local_inventario') . "');",
+                    'title' => $noreturntooltip,
+                    'aria-label' => $noreturntooltip,
+                    'role' => 'img',
                 ]
             );
-        } else {
-            $actions[] = html_writer::span($returnicondisabled, 'text-muted');
         }
 
         // Delete.
@@ -331,14 +396,23 @@ foreach ($reservations as $reservation) {
     }
     $statusbadge = '';
     if ($reservation->status === 'returned') {
-        $statusbadge = html_writer::span(get_string('returned', 'local_inventario'),
-            'badge bg-info text-white ms-1');
+        $label = $requiresreturn
+            ? get_string('returned', 'local_inventario')
+            : get_string('reservationexpiredshort', 'local_inventario');
+        $statusbadge = html_writer::span(
+            $label,
+            'badge bg-info text-white ms-1'
+        );
     } else if ($reservation->timeend < $now) {
-        $statusbadge = html_writer::span(get_string('reservationexpired', 'local_inventario'),
-            'badge bg-secondary text-white ms-1');
+        $statusbadge = html_writer::span(
+            get_string('reservationexpired', 'local_inventario'),
+            'badge bg-secondary text-white ms-1'
+        );
     } else if ($reservation->timestart <= $now && $reservation->timeend > $now) {
-        $statusbadge = html_writer::span(get_string('reservationactive', 'local_inventario'),
-            'badge bg-success text-white ms-1');
+        $statusbadge = html_writer::span(
+            get_string('reservationactive', 'local_inventario'),
+            'badge bg-success text-white ms-1'
+        );
     }
 
     $rows[] = [
@@ -347,7 +421,7 @@ foreach ($reservations as $reservation) {
             format_string($reservation->objectname) . $statusbadge,
             fullname($reservation),
             format_string($reservation->sitename),
-            userdate($reservation->timestart) . ' - ' . userdate($reservation->timeend),
+            userdate($reservation->timestart) . ' → ' . userdate($reservation->timeend),
             format_string($reservation->location),
             implode(' | ', $actions),
         ],
@@ -358,7 +432,7 @@ foreach ($reservations as $reservation) {
 }
 
 // Reorder rows: active/upcoming first, then expired; within each group newest timestart first.
-usort($rows, static function($a, $b) {
+usort($rows, static function ($a, $b) {
     if ($a['sort'] === $b['sort']) {
         return $b['timestart'] <=> $a['timestart'];
     }
@@ -371,12 +445,16 @@ $table->rowclasses = array_map(static fn($row) => $row['class'], $rows);
 echo html_writer::table($table);
 
 // Overlap error modal.
-echo html_writer::tag('div',
-    html_writer::tag('div',
-        html_writer::tag('div',
+echo html_writer::tag(
+    'div',
+    html_writer::tag(
+        'div',
+        html_writer::tag(
+            'div',
             html_writer::tag('div', get_string('error'), ['class' => 'modal-header']) .
             html_writer::tag('div', '', ['class' => 'modal-body', 'id' => 'inventario-overlap-modal-body']) .
-            html_writer::tag('div',
+            html_writer::tag(
+                'div',
                 html_writer::tag('button', get_string('closebuttontitle'), [
                     'type' => 'button',
                     'class' => 'btn btn-secondary',
@@ -393,8 +471,12 @@ echo html_writer::tag('div',
 
 if (!empty($overlaperror)) {
     $escaped = json_encode($overlaperror, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
-    $PAGE->requires->js_init_code("require(['jquery'], function($) { $('#inventario-overlap-modal-body').text({$escaped}); $('#inventario-overlap-modal').modal('show'); });");
+    $PAGE->requires->js_init_code(
+        "require(['jquery'], function($) {
+            $('#inventario-overlap-modal-body').text({$escaped});
+            $('#inventario-overlap-modal').modal('show');
+        });"
+    );
 }
 
 echo $OUTPUT->footer();
-

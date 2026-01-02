@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -66,12 +66,6 @@ echo $OUTPUT->header();
 echo local_inventario_render_nav($context);
 
 $form->display();
-$backurl = new moodle_url('/local/inventario/index.php');
-echo html_writer::div(
-    html_writer::link($backurl, get_string('pluginname', 'local_inventario'),
-        ['class' => 'btn btn-outline-secondary mt-2']),
-    'mt-2 mb-3'
-);
 
 $table = new html_table();
 $table->head = [get_string('site', 'local_inventario'), get_string('actions')];
@@ -92,4 +86,3 @@ foreach ($sites as $site) {
 echo html_writer::table($table);
 
 echo $OUTPUT->footer();
-

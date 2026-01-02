@@ -23,10 +23,6 @@
     text-align: right;
 }
 
-.inventario-nav .btn.active {
-    box-shadow: 0 0 0 0.12rem rgba(13, 110, 253, 0.35);
-}
-
 .inventario-license-details summary {
     list-style: none;
     cursor: pointer;
@@ -55,9 +51,73 @@
     min-width: 200px;
 }
 
-.inventario-child-property {
-    font-size: 0.85rem;
-    padding-left: 16px;
+.inventario-switch {
+    --clr: #0B6E4F;
+    appearance: none;
+    -webkit-appearance: none;
+    position: relative;
+    cursor: pointer;
+    width: 1.3em;
+    height: 1.3em;
+    border: none;
+    border-radius: 50%;
+    background-color: #ccc;
+    transition: 300ms;
+    vertical-align: middle;
+}
+.inventario-switch::after {
+    content: "";
+    position: absolute;
+    display: block;
+    left: 0.54em;
+    top: 0.30em;
+    width: 0.25em;
+    height: 0.5em;
+    border: solid #E0E0E2;
+    border-width: 0 0.15em 0.15em 0;
+    transform: rotate(45deg);
+    opacity: 0;
+    transition: opacity 150ms ease;
+}
+.inventario-switch:checked {
+    background-color: var(--clr);
+    border-radius: 0.5rem;
+    animation: inventario-pulse 500ms ease-in-out;
+}
+.inventario-switch:checked::after {
+    opacity: 1;
+}
+.inventario-switch:focus-visible {
+    outline: 2px solid rgba(11, 110, 79, 0.4);
+    outline-offset: 2px;
+}
+
+@keyframes inventario-pulse {
+    0% {
+        box-shadow: 0 0 0 rgba(11, 110, 79, 0.56);
+        rotate: 20deg;
+    }
+    50% {
+        rotate: -20deg;
+    }
+    75% {
+        box-shadow: 0 0 0 10px rgba(11, 110, 79, 0.38);
+    }
+    100% {
+        box-shadow: 0 0 0 13px rgba(11, 110, 79, 0.19);
+        rotate: 0;
+    }
+}
+
+.form-check-inline .form-check-input {
+    position: static;
+    margin-top: 0;
+    margin-left: 0;
+    margin-right: 0;
+}
+.inventario-switch:focus-visible {
+    outline: 2px solid #0d6efd;
+    outline-offset: 2px;
 }
 .inventario-color-chip {
     width: 16px;
@@ -124,6 +184,37 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.inventario-type-row {
+    cursor: pointer;
+}
+.inventario-type-row .fa-chevron-down {
+    transition: transform 0.2s ease;
+}
+.inventario-type-row.open .fa-chevron-down {
+    transform: rotate(180deg);
+}
+.inventario-type-objects td {
+    background: #f8fafc;
+}
+.inventario-object-card {
+    background: #fff;
+}
+.inventario-object-card .inventario-object-details {
+    margin-top: 8px;
+}
+.inventario-object-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+}
+.inventario-object-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+}
 .inventario-calendar-event-hidden {
     display: none;
 }
@@ -178,3 +269,4 @@
         height: 200px;
     }
 }
+

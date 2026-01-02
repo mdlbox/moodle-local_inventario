@@ -13,6 +13,7 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
 /**
  *
  * @package   local_inventario
@@ -27,8 +28,6 @@ use moodle_exception;
 use stdClass;
 use csv_import_reader;
 use local_inventario\local\license_manager;
-
-defined('MOODLE_INTERNAL') || die();
 
 /**
  * Manage object types and their properties.
@@ -56,10 +55,18 @@ class type_service {
 
         $now = time();
         $color = $this->normalise_color((string)($data->color ?? ''));
+        $requiresreturn = property_exists($data, 'requiresreturn')
+            ? (!empty($data->requiresreturn) ? 1 : 0)
+            : 1;
+        $requireslocation = property_exists($data, 'requireslocation')
+            ? (!empty($data->requireslocation) ? 1 : 0)
+            : 1;
         $record = (object)[
             'name' => trim($data->name ?? ''),
             'description' => $data->description ?? '',
             'color' => $color,
+            'requiresreturn' => $requiresreturn,
+            'requireslocation' => $requireslocation,
             'timemodified' => $now,
         ];
         if (empty($record->name)) {
@@ -181,11 +188,15 @@ class type_service {
                 }
                 $propids[] = (int)$properties[$short];
             }
+            $requiresreturnraw = $row['requiresreturn'] ?? '';
+            $requireslocationraw = $row['requireslocation'] ?? '';
             $payload = (object)[
                 'name' => $name,
                 'description' => $row['description'] ?? '',
                 'color' => $this->normalise_color((string)($row['color'] ?? '#2563eb')),
                 'properties' => $propids,
+                'requiresreturn' => $requiresreturnraw === '' ? 1 : (!empty($requiresreturnraw) ? 1 : 0),
+                'requireslocation' => $requireslocationraw === '' ? 1 : (!empty($requireslocationraw) ? 1 : 0),
             ];
             try {
                 if (!empty($existing[$name])) {
@@ -232,7 +243,7 @@ class type_service {
     public function get_type_property_ids(int $typeid): array {
         global $DB;
         $records = $DB->get_records('local_inventario_typeprops', ['typeid' => $typeid], '', 'propertyid');
-        return array_map(static function($rec) {
+        return array_map(static function ($rec) {
             return (int)$rec->propertyid;
         }, $records);
     }
@@ -259,7 +270,7 @@ class type_service {
         $allids = $assignedids;
         $queue = $assignedids;
         while (!empty($queue)) {
-            list($insql, $params) = $DB->get_in_or_equal($queue, SQL_PARAMS_NAMED);
+            [$insql, $params] = $DB->get_in_or_equal($queue, SQL_PARAMS_NAMED);
             $children = $DB->get_records_select('local_inventario_properties', "parentid {$insql}", $params, '', 'id');
             $queue = [];
             foreach ($children as $child) {
@@ -270,7 +281,7 @@ class type_service {
             }
         }
 
-        list($insqlall, $paramsall) = $DB->get_in_or_equal($allids, SQL_PARAMS_NAMED);
+        [$insqlall, $paramsall] = $DB->get_in_or_equal($allids, SQL_PARAMS_NAMED);
         $sql = "SELECT *
                   FROM {local_inventario_properties}
                  WHERE id {$insqlall}

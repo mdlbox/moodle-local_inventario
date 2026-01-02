@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -18,6 +18,8 @@
  * Install script for local_inventario.
  *
  * @package   local_inventario
+ * @copyright 2025 mdlbox - https://app.mdlbox.com
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 /**
@@ -101,9 +103,8 @@ function xmldb_local_inventario_install(): bool {
             }
         }
     } catch (\Throwable $ignored) {
-        // Silent failure; will retry on first manual validation.
+        debugging($ignored->getMessage(), DEBUG_DEVELOPER);
     }
 
     return true;
 }
-

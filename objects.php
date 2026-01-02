@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -40,9 +40,11 @@ $PAGE->set_url('/local/inventario/objects.php');
 $PAGE->set_context($context);
 $PAGE->set_title(get_string('manageobjects', 'local_inventario'));
 $PAGE->set_heading(get_string('manageobjects', 'local_inventario'));
+$PAGE->requires->css('/local/inventario/styles.css');
 
-$license = local_inventario_license()->refresh();
-$allowhidden = $license->status === 'pro';
+$licensemanager = local_inventario_license();
+$licensestatus = $licensemanager->refresh();
+$allowhidden = $licensemanager->is_feature_enabled('hidden');
 $typeservice = local_inventario_typeservice();
 $typeoptions = local_inventario_type_options();
 $service = local_inventario_service();
@@ -80,7 +82,15 @@ $properties = $typeid ? $typeservice->get_type_properties($typeid) : [];
 $siteoptions = local_inventario_site_options();
 $PAGE->set_url('/local/inventario/objects.php', ['id' => $id ?: null, 'typeid' => $typeid ?: null]);
 $baseurl = (new moodle_url('/local/inventario/objects.php', ['id' => $id ?: null]))->out(false);
-$form = new local_inventario_object_form($PAGE->url->out(false), $siteoptions, $typeoptions, $allowhidden, $properties, $baseurl);
+$form = new local_inventario_object_form(
+    $PAGE->url->out(false),
+    $siteoptions,
+    $typeoptions,
+    $allowhidden,
+    $properties,
+    $baseurl,
+    $licensemanager->is_pro()
+);
 
 if ($form->is_cancelled()) {
     redirect(new moodle_url('/local/inventario/index.php'));
@@ -108,11 +118,19 @@ if ($record) {
         $record->{'prop_' . $propid} = $value;
     }
     $record->typeid = $typeid;
+    $record->availableperiodenabled = isset($record->availableperiodenabled) ? (int)$record->availableperiodenabled : 0;
+    $record->availablefrom = $record->availablefrom ?? 0;
+    $record->availableto = $record->availableto ?? 0;
+    $record->availabletimes = $record->availabletimes ?? '';
     $form->set_data($record);
 } else {
     $form->set_data([
         'siteid' => $siteoptions ? array_key_first($siteoptions) : 0,
         'typeid' => $typeid,
+        'availableperiodenabled' => 0,
+        'availablefrom' => 0,
+        'availableto' => 0,
+        'availabletimes' => '',
     ]);
 }
 
@@ -131,7 +149,7 @@ $table->head = [
     get_string('status', 'local_inventario'),
     get_string('visibility', 'local_inventario'),
 ];
-if ($license->status === 'pro') {
+if ($licensestatus->status === 'pro') {
     $table->head[] = get_string('history', 'local_inventario');
 }
 $table->head[] = get_string('actions');
@@ -150,9 +168,16 @@ foreach ($objects as $object) {
         'sesskey' => sesskey(),
     ]);
     $hasactive = $service->has_active_reservation_now($object->id);
-    $statuskey = $hasactive ? $object->status : 'available';
-    $statuslabel = get_string('status_' . $statuskey, 'local_inventario');
-    $statusclass = $statuskey === 'available' ? 'badge bg-success text-white' : 'badge bg-danger text-white';
+    $currentlyavailable = $service->is_available_now($object);
+    if (!$currentlyavailable && empty($hasactive)) {
+        $statuskey = 'unavailable';
+        $statuslabel = get_string('status_unavailable', 'local_inventario');
+        $statusclass = 'badge bg-secondary text-white';
+    } else {
+        $statuskey = $hasactive ? $object->status : 'available';
+        $statuslabel = get_string('status_' . $statuskey, 'local_inventario');
+        $statusclass = $statuskey === 'available' ? 'badge bg-success text-white' : 'badge bg-danger text-white';
+    }
     $row = [
         format_string($object->name),
         format_string($typeoptions[$object->typeid] ?? ''),
@@ -160,7 +185,7 @@ foreach ($objects as $object) {
         html_writer::span($statuslabel, $statusclass),
         $object->visible ? get_string('visible', 'local_inventario') : get_string('hidden', 'local_inventario'),
     ];
-    if ($license->status === 'pro') {
+    if ($licensestatus->status === 'pro') {
         $historyurl = new moodle_url('/local/inventario/stats.php', ['objectid' => $object->id]);
         $historyicon = $OUTPUT->pix_icon('i/log', get_string('history', 'local_inventario'));
         $row[] = html_writer::link($historyurl, $historyicon, ['title' => get_string('viewhistory', 'local_inventario')]);
@@ -177,7 +202,11 @@ foreach ($objects as $object) {
     } else {
         $actions[] = get_string('proonly', 'local_inventario');
     }
-    $actions[] = html_writer::link($deleteurl, $deleteicon, ['onclick' => "return confirm('" . get_string('confirmdeleteobject', 'local_inventario') . "');"]);
+    $actions[] = html_writer::link(
+        $deleteurl,
+        $deleteicon,
+        ['onclick' => "return confirm('" . get_string('confirmdeleteobject', 'local_inventario') . "');"]
+    );
     $row[] = implode(' ', $actions);
     $table->data[] = $row;
 }
@@ -185,4 +214,3 @@ foreach ($objects as $object) {
 echo html_writer::table($table);
 
 echo $OUTPUT->footer();
-

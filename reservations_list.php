@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -95,14 +95,16 @@ $useroptions = local_inventario_user_options();
 
 echo $OUTPUT->header();
 echo local_inventario_render_nav($context);
-$PAGE->requires->js_call_amd('core/tooltip', 'init');
 
 // Action buttons.
 $actionbuttons = [];
 if ($canreserve) {
     $addurl = new moodle_url('/local/inventario/reservations.php');
-    $actionbuttons[] = html_writer::link($addurl, get_string('addreservation', 'local_inventario'),
-        ['class' => 'btn btn-primary']);
+    $actionbuttons[] = html_writer::link(
+        $addurl,
+        get_string('addreservation', 'local_inventario'),
+        ['class' => 'btn btn-primary']
+    );
 }
 if (!empty($actionbuttons)) {
     echo html_writer::div(implode(' ', $actionbuttons), 'd-flex justify-content-end gap-2 mb-3');
@@ -215,45 +217,59 @@ if ($license->status === 'pro') {
         $label = $opt === 0 ? get_string('all', 'local_inventario') : $opt;
         $optionshtml .= html_writer::tag('option', $label, $attrs);
     }
-    $controls = html_writer::tag('label', get_string('itemsperpage', 'local_inventario'), ['for' => 'perpage', 'class' => 'me-2 mb-0']) .
-        html_writer::tag('select', $optionshtml, ['name' => 'perpage', 'id' => 'perpage', 'class' => 'custom-select w-auto me-2']);
+    $controls = html_writer::tag(
+        'label',
+        get_string('itemsperpage', 'local_inventario'),
+        ['for' => 'perpage', 'class' => 'me-2 mb-0']
+    );
+    $controls .= html_writer::tag(
+        'select',
+        $optionshtml,
+        ['name' => 'perpage', 'id' => 'perpage', 'class' => 'custom-select w-auto me-2']
+    );
 
-    $submitcell = $controls;
-    $submitcell .= html_writer::empty_tag('input', [
+    $submitcell = html_writer::empty_tag('input', [
         'type' => 'submit',
         'value' => get_string('filter', 'local_inventario'),
         'class' => 'btn btn-primary me-2',
     ]);
     // Reset filters.
     $reseturl = new moodle_url($PAGE->url);
-    $submitcell .= html_writer::link($reseturl, get_string('resetfilters', 'local_inventario'),
-        ['class' => 'btn btn-secondary']);
+    $submitcell .= html_writer::link(
+        $reseturl,
+        get_string('resetfilters', 'local_inventario'),
+        ['class' => 'btn btn-secondary']
+    );
+    $submitcontent = html_writer::div(
+        $controls . $submitcell,
+        'd-inline-flex align-items-center flex-wrap justify-content-end gap-2'
+    );
     if ($objectfilter) {
-        $submitcell .= html_writer::empty_tag('input', [
+        $submitcontent .= html_writer::empty_tag('input', [
             'type' => 'hidden',
             'name' => 'objectid',
             'value' => $objectfilter,
         ]);
     }
     if ($startfrom) {
-        $submitcell .= html_writer::empty_tag('input', [
+        $submitcontent .= html_writer::empty_tag('input', [
             'type' => 'hidden',
             'name' => 'startfrom',
             'value' => $startfrom,
         ]);
     }
     if ($endto) {
-        $submitcell .= html_writer::empty_tag('input', [
+        $submitcontent .= html_writer::empty_tag('input', [
             'type' => 'hidden',
             'name' => 'endto',
             'value' => $endto,
         ]);
     }
-    echo html_writer::tag('td', $submitcell, ['colspan' => 2]);
+    echo html_writer::tag('td', $submitcontent, ['colspan' => 2, 'class' => 'text-end']);
     echo html_writer::end_tag('tr');
 
     echo html_writer::end_tag('table');
-    echo html_writer::end_div(); // end align right wrapper.
+    echo html_writer::end_div(); // End align right wrapper.
     echo html_writer::end_tag('form');
     echo html_writer::end_div();
     echo html_writer::end_div();
@@ -265,7 +281,7 @@ if (!empty($reservations)) {
     global $DB;
     $objectids = array_unique(array_map(static fn($r) => (int)$r->objectid, $reservations));
     if (!empty($objectids)) {
-        list($insql, $inparams) = $DB->get_in_or_equal($objectids, SQL_PARAMS_NAMED);
+        [$insql, $inparams] = $DB->get_in_or_equal($objectids, SQL_PARAMS_NAMED);
         $propvals = $DB->get_records_sql(
             "SELECT pv.objectid, p.name, pv.value
                FROM {local_inventario_propvals} pv
@@ -315,26 +331,45 @@ foreach ($reservations as $reservation) {
             $proplines[] = $prop;
         }
         $detailparts = [];
-        $detailparts[] = html_writer::div(html_writer::tag('strong', get_string('object', 'local_inventario') . ': ') . $objectcell);
-        $detailparts[] = html_writer::div(html_writer::tag('strong', get_string('site', 'local_inventario') . ': ') . format_string($reservation->sitename));
-        $detailparts[] = html_writer::div(html_writer::tag('strong', get_string('type', 'local_inventario') . ': ') . format_string($typebyid[$reservation->typeid] ?? ''));
-        $detailparts[] = html_writer::div(html_writer::tag('strong', get_string('user') . ': ') . fullname($reservation));
-        $detailparts[] = html_writer::div(html_writer::tag('strong', get_string('period', 'local_inventario') . ': ') .
-            userdate($reservation->timestart) . ' - ' . userdate($reservation->timeend));
+        $detailparts[] = html_writer::div(
+            html_writer::tag('strong', get_string('object', 'local_inventario') . ': ') . $objectcell
+        );
+        $detailparts[] = html_writer::div(
+            html_writer::tag('strong', get_string('site', 'local_inventario') . ': ') .
+            format_string($reservation->sitename)
+        );
+        $detailparts[] = html_writer::div(
+            html_writer::tag('strong', get_string('type', 'local_inventario') . ': ') .
+            format_string($typebyid[$reservation->typeid] ?? '')
+        );
+        $detailparts[] = html_writer::div(
+            html_writer::tag('strong', get_string('user') . ': ') . fullname($reservation)
+        );
+        $detailparts[] = html_writer::div(
+            html_writer::tag('strong', get_string('period', 'local_inventario') . ': ') .
+            userdate($reservation->timestart) . ' → ' . userdate($reservation->timeend)
+        );
         if (!empty($reservation->location)) {
-            $detailparts[] = html_writer::div(html_writer::tag('strong', get_string('location', 'local_inventario') . ': ') .
-                format_string($reservation->location));
+            $detailparts[] = html_writer::div(
+                html_writer::tag('strong', get_string('location', 'local_inventario') . ': ') .
+                format_string($reservation->location)
+            );
         }
         if (!empty($proplines)) {
             $detailparts[] = html_writer::div(html_writer::tag('strong', get_string('properties', 'local_inventario')));
             $detailparts[] = html_writer::alist($proplines);
         }
         $detailhtml = implode('', $detailparts);
-        $detailblocks[$reservation->objectid] = html_writer::div($detailhtml, 'd-none', ['id' => 'inventario-res-detail-' . $reservation->objectid]);
+        $detailblocks[$reservation->objectid] = html_writer::div(
+            $detailhtml,
+            'd-none',
+            ['id' => 'inventario-res-detail-' . $reservation->objectid]
+        );
         $seenobjects[$reservation->objectid] = true;
     }
 
-    $actions = html_writer::link('#',
+    $actions = html_writer::link(
+        '#',
         html_writer::span('', 'fa fa-info-circle text-info', ['aria-hidden' => 'true']) .
         html_writer::span(get_string('info'), 'sr-only'),
         [
@@ -349,7 +384,7 @@ foreach ($reservations as $reservation) {
         format_string($typebyid[$reservation->typeid] ?? ''),
         fullname($reservation),
         format_string($reservation->sitename),
-        userdate($reservation->timestart) . ' - ' . userdate($reservation->timeend),
+        userdate($reservation->timestart) . ' → ' . userdate($reservation->timeend),
         format_string($reservation->location),
         $actions,
     ];
@@ -367,12 +402,16 @@ if (!empty($detailblocks)) {
 }
 
 // Info modal + JS (reuse simple jQuery logic).
-echo html_writer::tag('div',
-    html_writer::tag('div',
-        html_writer::tag('div',
+echo html_writer::tag(
+    'div',
+    html_writer::tag(
+        'div',
+        html_writer::tag(
+            'div',
             html_writer::tag('div', '', ['class' => 'modal-header', 'id' => 'inventario-res-modal-title']) .
             html_writer::tag('div', '', ['class' => 'modal-body', 'id' => 'inventario-res-modal-body']) .
-            html_writer::tag('div',
+            html_writer::tag(
+                'div',
                 html_writer::tag('button', get_string('closebuttontitle'), [
                     'type' => 'button',
                     'class' => 'btn btn-secondary',
@@ -402,4 +441,3 @@ require(['jquery'], function($) {
 ");
 
 echo $OUTPUT->footer();
-

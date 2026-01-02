@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -26,21 +26,28 @@ namespace local_inventario\local;
 
 use curl;
 use moodle_exception;
+use local_inventario\local\secrets;
 
 defined('MOODLE_INTERNAL') || die();
 global $CFG;
 require_once($CFG->libdir . '/filelib.php');
+require_once(__DIR__ . '/secrets.php');
 
-
+/**
+ * Minimal HTTP client for the licensing backend.
+ */
 class api_client {
     /** @var string */
     private $endpoint;
     /** @var string */
     private $token;
 
+    /**
+     * Build the client using saved plugin configuration.
+     */
     public function __construct() {
-        $this->endpoint = rtrim(trim((string)get_config('local_inventario', 'endpoint')), '/');
-        $this->token = trim((string)get_config('local_inventario', 'apitoken'));
+        $this->endpoint = rtrim(trim(secrets::endpoint()), '/');
+        $this->token = trim(secrets::apitoken());
     }
 
     /**
@@ -129,10 +136,10 @@ class api_client {
             $response = curl_exec($ch);
             if ($response === false) {
                 $err = curl_error($ch);
-                curl_close($ch);
+                curl_close($ch); // phpcs:ignore PHPCompatibility.FunctionUse.RemovedFunctions.curl_closeDeprecated
                 throw new moodle_exception('apirequestfailed', 'local_inventario', '', $err);
             }
-            curl_close($ch);
+            curl_close($ch); // phpcs:ignore PHPCompatibility.FunctionUse.RemovedFunctions.curl_closeDeprecated
         } else {
             $response = $this->native_post($url, $payload, $signature);
             // If some layer blocks localhost, retry with 127.0.0.1.
@@ -182,10 +189,10 @@ class api_client {
             $response = curl_exec($ch);
             if ($response === false) {
                 $err = curl_error($ch);
-                curl_close($ch);
+                curl_close($ch); // phpcs:ignore PHPCompatibility.FunctionUse.RemovedFunctions.curl_closeDeprecated
                 throw new moodle_exception('apirequestfailed', 'local_inventario', '', $err);
             }
-            curl_close($ch);
+            curl_close($ch); // phpcs:ignore PHPCompatibility.FunctionUse.RemovedFunctions.curl_closeDeprecated
             return (string)$response;
         }
 
@@ -221,4 +228,3 @@ class api_client {
         return hash_hmac('sha256', json_encode($normalized), $this->token);
     }
 }
-

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -33,11 +33,20 @@ class local_inventario_type_form extends moodleform {
     /** @var array */
     private $properties;
 
+    /**
+     * Type form constructor.
+     *
+     * @param string $action
+     * @param array $properties
+     */
     public function __construct($action, array $properties) {
         $this->properties = $properties;
         parent::__construct($action);
     }
 
+    /**
+     * Define form fields.
+     */
     public function definition() {
         $mform = $this->_form;
 
@@ -62,14 +71,50 @@ class local_inventario_type_form extends moodleform {
         $mform->addRule('color', get_string('invalidcolor', 'local_inventario'), 'regex', '/^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/');
         $mform->setType('color', PARAM_TEXT);
 
+        $requiresreturnel = $mform->createElement(
+            'advcheckbox',
+            'requiresreturn',
+            '',
+            '',
+            ['class' => 'inventario-switch']
+        );
+        $mform->addGroup(
+            [$requiresreturnel],
+            'requiresreturn_group',
+            get_string('requiresreturn', 'local_inventario'),
+            '',
+            false
+        );
+        $mform->setDefault('requiresreturn', 1);
+        $requireslocationel = $mform->createElement(
+            'advcheckbox',
+            'requireslocation',
+            '',
+            '',
+            ['class' => 'inventario-switch']
+        );
+        $mform->addGroup(
+            [$requireslocationel],
+            'requireslocation_group',
+            get_string('requireslocation', 'local_inventario'),
+            '',
+            false
+        );
+        $mform->setDefault('requireslocation', 1);
+
         $options = [];
         foreach ($this->properties as $prop) {
             $options[$prop->id] = format_string($prop->name);
         }
-        $mform->addElement('select', 'properties', get_string('typeproperties', 'local_inventario'), $options, ['multiple' => true, 'size' => 8]);
+        $mform->addElement(
+            'select',
+            'properties',
+            get_string('typeproperties', 'local_inventario'),
+            $options,
+            ['multiple' => true, 'size' => 8]
+        );
         $mform->setType('properties', PARAM_RAW);
 
         $this->add_action_buttons();
     }
 }
-

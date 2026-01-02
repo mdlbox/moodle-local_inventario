@@ -1,7 +1,7 @@
 <div class="inventario-dashboard">
     <div class="d-flex justify-content-end">
         <details class="mb-3 inventario-license-details">
-            <summary class="btn btn-outline-info btn-sm d-inline-block">{{#str}}licenseinfo, local_inventario{{/str}}</summary>
+            <summary class="btn btn-secondary d-inline-block">{{#str}}licenseinfo, local_inventario{{/str}}</summary>
             <div class="card shadow-sm mt-2 inventario-license-card">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -94,8 +94,8 @@
                         <option value="{{value}}" {{#selected}}selected{{/selected}}>{{label}}</option>
                     {{/objectfilters.perpageoptions}}
                 </select>
-                <a href="{{links.objects}}" class="btn btn-outline-secondary btn-sm ms-2">{{#str}}resetfilters, local_inventario{{/str}}</a>
-                <button type="submit" class="btn btn-primary btn-sm ms-2">{{#str}}filter, local_inventario{{/str}}</button>
+                <a href="{{links.objects}}" class="btn btn-secondary ms-2">{{#str}}resetfilters, local_inventario{{/str}}</a>
+                <button type="submit" class="btn btn-primary ms-2">{{#str}}filter, local_inventario{{/str}}</button>
             </div>
         </div>
     </form>
@@ -165,7 +165,7 @@
                 <option value="{{value}}" {{#selected}}selected{{/selected}}>{{label}}</option>
             {{/reservationfilters.perpageoptions}}
         </select>
-        <button type="submit" class="btn btn-primary btn-sm">{{#str}}apply, moodle{{/str}}</button>
+        <button type="submit" class="btn btn-secondary">{{#str}}apply, moodle{{/str}}</button>
     </form>
     <div class="table-responsive">
         <table class="generaltable inventario-table">

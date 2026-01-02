@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -34,14 +34,10 @@ use core_privacy\local\request\transform;
 use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
 
-defined('MOODLE_INTERNAL') || die();
-
-
-class provider implements
-    \core_privacy\local\metadata\provider,
-    plugin_provider,
-    \core_privacy\local\request\userlist_provider {
-
+/**
+ * Privacy provider for local_inventario.
+ */
+class provider implements plugin_provider, \core_privacy\local\metadata\provider, \core_privacy\local\request\userlist_provider {
     /**
      * Describe stored data.
      *
@@ -172,8 +168,7 @@ class provider implements
             return;
         }
 
-        list($insql, $params) = $DB->get_in_or_equal($userlist->get_userids(), SQL_PARAMS_NAMED);
+        [$insql, $params] = $DB->get_in_or_equal($userlist->get_userids(), SQL_PARAMS_NAMED);
         $DB->delete_records_select('local_inventario_reserv', "userid $insql", $params);
     }
 }
-

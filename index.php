@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -79,8 +79,9 @@ require(['jquery'], function($) {
 });
 ");
 
-$license = local_inventario_license()->refresh();
-$allowhidden = $license->status === 'pro';
+$licensemanager = local_inventario_license();
+$license = $licensemanager->refresh();
+$allowhidden = $licensemanager->is_feature_enabled('hidden');
 $includehidden = local_inventario_can_see_hidden();
 
 $service = local_inventario_service();
@@ -136,18 +137,31 @@ foreach ($propertiesdefs as $prop) {
 $objectdata = [];
 foreach ($objects as $object) {
     $hasactive = $service->has_active_reservation_now($object->id);
-    $statuskey = $hasactive ? $object->status : 'available';
-    $statuslabel = get_string('status_' . $statuskey, 'local_inventario');
-    $statusclass = $statuskey === 'available' ? 'badge bg-success text-white' : 'badge bg-danger text-white';
+    $currentlyavailable = $service->is_available_now($object);
+    if (!$currentlyavailable && empty($hasactive)) {
+        $statuskey = 'unavailable';
+        $statuslabel = get_string('status_unavailable', 'local_inventario');
+        $statusclass = 'badge bg-secondary text-white';
+    } else {
+        $statuskey = $hasactive ? $object->status : 'available';
+        $statuslabel = get_string('status_' . $statuskey, 'local_inventario');
+        $statusclass = $statuskey === 'available' ? 'badge bg-success text-white' : 'badge bg-danger text-white';
+    }
     $unreturned = (!$hasactive && $service->get_past_reservations_open($object->id) > 0);
     $statushtml = html_writer::span($statuslabel, $statusclass);
     if ($unreturned) {
-        $statushtml .= ' ' . html_writer::span(get_string('unreturned', 'local_inventario'), 'badge bg-warning text-white');
+        $statushtml .= ' ' . html_writer::span(
+            get_string('unreturned', 'local_inventario'),
+            'badge bg-warning text-white'
+        );
     }
     $namebadge = format_string($object->name);
     $lastres = $service->get_last_reservation_summary($object->id);
     if ($lastres && $lastres['status'] === 'active') {
-        $namebadge .= ' ' . html_writer::span(get_string('reservationactive', 'local_inventario'), 'badge bg-success text-white ms-1');
+        $namebadge .= ' ' . html_writer::span(
+            get_string('reservationactive', 'local_inventario'),
+            'badge bg-success text-white ms-1'
+        );
     }
 
     $propvalues = $service->get_property_values($object->id);
@@ -165,15 +179,58 @@ foreach ($objects as $object) {
     }
 
     $detailparts = [];
-    $detailparts[] = html_writer::div(html_writer::tag('strong', get_string('object', 'local_inventario') . ': ') . format_string($object->name));
-    $detailparts[] = html_writer::div(html_writer::tag('strong', get_string('site', 'local_inventario') . ': ') . format_string($siteoptionsraw[$object->siteid] ?? ''));
-    $detailparts[] = html_writer::div(html_writer::tag('strong', get_string('type', 'local_inventario') . ': ') . format_string($typeoptionsraw[$object->typeid] ?? ''));
-    $detailparts[] = html_writer::div(html_writer::tag('strong', get_string('status', 'local_inventario') . ': ') . s($statuslabel));
+    $detailparts[] = html_writer::div(
+        html_writer::tag('strong', get_string('object', 'local_inventario') . ': ') .
+        format_string($object->name)
+    );
+    $detailparts[] = html_writer::div(
+        html_writer::tag('strong', get_string('site', 'local_inventario') . ': ') .
+        format_string($siteoptionsraw[$object->siteid] ?? '')
+    );
+    $detailparts[] = html_writer::div(
+        html_writer::tag('strong', get_string('type', 'local_inventario') . ': ') .
+        format_string($typeoptionsraw[$object->typeid] ?? '')
+    );
+    $detailparts[] = html_writer::div(
+        html_writer::tag('strong', get_string('status', 'local_inventario') . ': ') .
+        s($statuslabel)
+    );
     if (!empty($object->currentlocation)) {
-        $detailparts[] = html_writer::div(html_writer::tag('strong', get_string('location', 'local_inventario') . ': ') . format_string($object->currentlocation));
+        $detailparts[] = html_writer::div(
+            html_writer::tag('strong', get_string('location', 'local_inventario') . ': ') .
+            format_string($object->currentlocation)
+        );
     }
     if (!empty($object->description)) {
-        $detailparts[] = html_writer::div(html_writer::tag('strong', get_string('description') . ': ') . format_text($object->description, FORMAT_HTML), 'mt-2');
+        $detailparts[] = html_writer::div(
+            html_writer::tag('strong', get_string('description') . ': ') .
+            format_text($object->description, FORMAT_HTML),
+            'mt-2'
+        );
+    }
+    // Disponibilità estesa (solo Pro).
+    if (!empty($object->availableperiodenabled)) {
+        $availabilitylines = [];
+        if (!empty($object->availablefrom)) {
+            $availabilitylines[] = get_string('availability_from', 'local_inventario') . ': ' . userdate($object->availablefrom);
+        }
+        if (!empty($object->availableto)) {
+            $availabilitylines[] = get_string('availability_to', 'local_inventario') . ': ' . userdate($object->availableto);
+        }
+        $slotsraw = trim((string)$object->availabletimes);
+        if ($slotsraw !== '') {
+            $slots = array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $slotsraw)));
+            if (!empty($slots)) {
+                $availabilitylines[] = get_string('availability_times', 'local_inventario') . ': ' . implode(', ', $slots);
+            }
+        }
+        $availabilitylines[] = get_string('status', 'local_inventario') . ': ' .
+            ($currentlyavailable ? get_string('status_available', 'local_inventario') : get_string('status_unavailable', 'local_inventario'));
+        $detailparts[] = html_writer::div(
+            html_writer::tag('strong', get_string('availability', 'local_inventario')) . ' ' .
+            html_writer::alist($availabilitylines),
+            'mt-2'
+        );
     }
     if ($lastres) {
         $detailparts[] = html_writer::div(
@@ -210,7 +267,7 @@ foreach ($objects as $object) {
 $reservationdata = [];
 // Limit reservations for display.
 $reservationslist = array_values($reservations);
-usort($reservationslist, static function($a, $b) {
+usort($reservationslist, static function ($a, $b) {
     // Newer/upcoming reservations first.
     return $b->timestart <=> $a->timestart;
 });
@@ -224,7 +281,7 @@ foreach ($reservationslist as $reservation) {
         'object' => format_string($reservation->objectname),
         'user' => fullname($reservation),
         'site' => format_string($reservation->sitename),
-        'period' => userdate($reservation->timestart) . ' â†’ ' . userdate($reservation->timeend),
+        'period' => userdate($reservation->timestart) . ' → ' . userdate($reservation->timeend),
         'location' => format_string($reservation->location),
         'canmanage' => $canmanage || $reservation->userid == $USER->id,
     ];
@@ -244,44 +301,74 @@ $renderable = new \local_inventario\output\dashboard([
     ],
     'objects' => $objectdata,
     'reservations' => $reservationdata,
-    'stats' => [
-        'objects' => $stats['objects'],
-        'reservations' => $stats['reservations'],
-        'userreservations' => $stats['userreservations'],
-        'usage' => array_values(array_map(static function($row) {
-            return [
-                'name' => format_string($row->name),
-                'total' => $row->total,
-            ];
-        }, $stats['usage'] ?? [])),
-    ],
-    'objectfilters' => [
-        'search' => $search,
-        'selectedtype' => $typefilter,
-        'selectedstatus' => $statusfilter,
-        'selectedsite' => $siteid,
-        'perpage' => $perpage,
-        'perpageoptions' => array_map(static function($val) use ($perpage) {
-            return ['value' => $val, 'label' => $val === 0 ? get_string('all', 'local_inventario') : $val, 'selected' => ((int)$val === (int)$perpage)];
-        }, [10, 20, 50, 100, 0]),
-        'types' => array_map(static function($id, $name) use ($typefilter) {
+        'stats' => [
+            'objects' => $stats['objects'],
+            'reservations' => $stats['reservations'],
+            'userreservations' => $stats['userreservations'],
+            'usage' => array_values(array_map(static function ($row) {
+                return [
+                    'name' => format_string($row->name),
+                    'total' => $row->total,
+                ];
+            }, $stats['usage'] ?? [])),
+            ],
+        'objectfilters' => [
+            'search' => $search,
+            'selectedtype' => $typefilter,
+            'selectedstatus' => $statusfilter,
+            'selectedsite' => $siteid,
+            'perpage' => $perpage,
+            'perpageoptions' => array_map(
+                static function ($val) use ($perpage) {
+                    return [
+                        'value' => $val,
+                        'label' => $val === 0 ? get_string('all', 'local_inventario') : $val,
+                        'selected' => ((int)$val === (int)$perpage),
+                    ];
+                },
+                [10, 20, 50, 100, 0]
+            ),
+        'types' => array_map(static function ($id, $name) use ($typefilter) {
             return ['id' => $id, 'name' => format_string($name), 'selected' => ((int)$id === (int)$typefilter)];
         }, array_keys($typeoptionsraw), $typeoptionsraw),
-        'sites' => array_map(static function($id, $name) use ($siteid) {
+        'sites' => array_map(static function ($id, $name) use ($siteid) {
             return ['id' => $id, 'name' => format_string($name), 'selected' => ((int)$id === (int)$siteid)];
         }, array_keys($siteoptionsraw), $siteoptionsraw),
         'statuses' => [
-            ['value' => '', 'label' => get_string('all', 'local_inventario'), 'selected' => $statusfilter === ''],
-            ['value' => 'available', 'label' => get_string('status_available', 'local_inventario'), 'selected' => $statusfilter === 'available'],
-            ['value' => 'reserved', 'label' => get_string('status_reserved', 'local_inventario'), 'selected' => $statusfilter === 'reserved'],
-            ['value' => 'offsite', 'label' => get_string('status_offsite', 'local_inventario'), 'selected' => $statusfilter === 'offsite'],
-        ],
+            [
+                'value' => '',
+                'label' => get_string('all', 'local_inventario'),
+                'selected' => $statusfilter === '',
+            ],
+            [
+                'value' => 'available',
+                'label' => get_string('status_available', 'local_inventario'),
+                'selected' => $statusfilter === 'available',
+            ],
+            [
+                'value' => 'reserved',
+                'label' => get_string('status_reserved', 'local_inventario'),
+                'selected' => $statusfilter === 'reserved',
+            ],
+            [
+                'value' => 'offsite',
+                'label' => get_string('status_offsite', 'local_inventario'),
+                'selected' => $statusfilter === 'offsite',
+            ],
+            ],
     ],
     'reservationfilters' => [
         'perpage' => $resperpage,
-        'perpageoptions' => array_map(static function($val) use ($resperpage) {
-            return ['value' => $val, 'label' => $val === 0 ? get_string('all', 'local_inventario') : $val, 'selected' => ((int)$val === (int)$resperpage)];
-        }, [10, 20, 50, 100, 0]),
+        'perpageoptions' => array_map(
+            static function ($val) use ($resperpage) {
+                return [
+                    'value' => $val,
+                    'label' => $val === 0 ? get_string('all', 'local_inventario') : $val,
+                    'selected' => ((int)$val === (int)$resperpage),
+                ];
+            },
+            [10, 20, 50, 100, 0]
+        ),
     ],
     'links' => [
         // Reset filters: point back to dashboard without params to avoid capability issues.
@@ -303,11 +390,16 @@ echo $OUTPUT->header();
 echo local_inventario_render_nav($context);
 
 if (!empty($license->expiresat) && $license->expiresat < time()) {
-    echo $OUTPUT->notification(get_string('licenseexpired', 'local_inventario', userdate($license->expiresat)), 'error');
+    echo $OUTPUT->notification(
+        get_string('licenseexpired', 'local_inventario', userdate($license->expiresat)),
+        'error'
+    );
 } else if ($license->status !== 'pro') {
-    echo $OUTPUT->notification(get_string('licenseinvalid', 'local_inventario'), 'warning');
+    echo $OUTPUT->notification(
+        get_string('licenseinvalid', 'local_inventario'),
+        'warning'
+    );
 }
 
 echo $renderer->render_dashboard($renderable);
 echo $OUTPUT->footer();
-

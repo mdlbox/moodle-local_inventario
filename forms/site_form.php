@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -30,6 +30,9 @@ require_once($CFG->libdir . '/formslib.php');
  * Form per la gestione delle sedi.
  */
 class local_inventario_site_form extends moodleform {
+    /**
+     * Define form fields.
+     */
     public function definition() {
         $mform = $this->_form;
 
@@ -43,4 +46,3 @@ class local_inventario_site_form extends moodleform {
         $this->add_action_buttons();
     }
 }
-

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -26,17 +26,35 @@ namespace local_inventario\local;
 
 use moodle_exception;
 use stdClass;
+use local_inventario\local\secrets;
 
 defined('MOODLE_INTERNAL') || die();
+require_once(__DIR__ . '/secrets.php');
 
-
+/**
+ * License manager that validates signed responses and enforces limits.
+ */
 class license_manager {
-    private const PROTOKEN_GRACE = 30; // Seconds of slack before token expiry.
-    private const RESPONSE_MAX_AGE = 3600; // Reject responses older than 1h.
+    /** Seconds of slack before token expiry. */
+    private const PROTOKEN_GRACE = 30;
+    /** Maximum age (seconds) for signed responses. */
+    private const RESPONSE_MAX_AGE = 1800;
+    /** Maximum age (seconds) before forcing refresh of cache even if signature valid. */
+    private const HARD_MAX_CACHE_AGE = 7200;
+    /** Allowed license endpoints (hosts). */
+    private const ALLOWED_HOSTS = ['app.mdlbox.com', 'api.mdlbox.com', 'license.mdlbox.com'];
 
     /** @var api_client|null */
     private $client;
 
+    /** @var array<string,bool> Cached feature flags during a request. */
+    private $featurecache = [];
+
+    /**
+     * License manager constructor.
+     *
+     * @param api_client|null $client Optional API client override.
+     */
     public function __construct(?api_client $client = null) {
         $this->client = $client ?? new api_client();
     }
@@ -52,7 +70,7 @@ class license_manager {
             try {
                 $status = $this->refresh(true);
             } catch (\Throwable $ignore) {
-                // fall through to final validation.
+                debugging($ignore->getMessage(), DEBUG_DEVELOPER);
             }
         }
 
@@ -65,7 +83,7 @@ class license_manager {
             try {
                 $status = $this->refresh(true);
             } catch (\Throwable $ignore) {
-                // fall through to validation below.
+                debugging($ignore->getMessage(), DEBUG_DEVELOPER);
             }
         }
 
@@ -87,7 +105,7 @@ class license_manager {
             try {
                 $status = $this->refresh(true);
             } catch (\Throwable $ignore) {
-                // keep going with current status.
+                debugging($ignore->getMessage(), DEBUG_DEVELOPER);
             }
         }
 
@@ -100,6 +118,44 @@ class license_manager {
             $limits['allowhidden'] = false;
         }
         return $limits;
+    }
+
+    /**
+     * Check if a named feature is enabled given the current license state.
+     *
+     * @param string $feature
+     * @return bool
+     */
+    public function is_feature_enabled(string $feature): bool {
+        $feature = strtolower(trim($feature));
+        if (array_key_exists($feature, $this->featurecache)) {
+            return $this->featurecache[$feature];
+        }
+
+        $enabled = false;
+        switch ($feature) {
+            case 'hidden':
+            case 'allowhidden':
+                $limits = $this->get_limits();
+                $enabled = $this->is_pro() && !empty($limits['allowhidden']);
+                break;
+            case 'availability':
+            case 'timewindow':
+                $enabled = $this->is_pro();
+                break;
+            case 'periodic':
+            case 'recurring':
+                $enabled = $this->is_pro();
+                break;
+            case 'publicpage':
+                $enabled = $this->is_pro();
+                break;
+            default:
+                $enabled = false;
+        }
+
+        $this->featurecache[$feature] = $enabled;
+        return $enabled;
     }
 
     /**
@@ -124,7 +180,10 @@ class license_manager {
             $changed = true;
         }
 
-        if ($record->status === 'pro' && (!$this->validate_signature($record) || !$this->has_valid_pro_token($record))) {
+        $stale = $record->status === 'pro' && $record->lastcheck > 0
+            && ($now - (int)$record->lastcheck) > self::HARD_MAX_CACHE_AGE;
+
+        if ($record->status === 'pro' && (!$this->validate_signature($record) || !$this->has_valid_pro_token($record) || $stale)) {
             $record->status = 'free';
             $changed = true;
             $record->signature = null;
@@ -157,10 +216,10 @@ class license_manager {
 
         $record = $this->get_status();
         $now = time();
-        $endpoint = trim((string)get_config('local_inventario', 'endpoint'));
-        $token = trim((string)get_config('local_inventario', 'apitoken'));
+        $endpoint = trim(secrets::endpoint());
+        $token = trim(secrets::apitoken());
 
-        if (empty($endpoint) || empty($token)) {
+        if (empty($endpoint) || empty($token) || !$this->is_endpoint_allowed($endpoint)) {
             $record->status = 'free';
             $record->lastpayload = get_string('api_not_configured', 'local_inventario');
             $record->signature = null;
@@ -175,10 +234,10 @@ class license_manager {
 
         $checkinterval = (int)get_config('local_inventario', 'checkinterval');
         if ($checkinterval <= 0) {
-            $checkinterval = 3600;
+            $checkinterval = 1800;
         }
 
-        if (!$force && ($now - (int)$record->lastcheck) < $checkinterval && $this->validate_signature($record)) {
+        if (!$force && ($now - (int)$record->lastcheck) < $checkinterval && $this->validate_signature($record) && $this->has_valid_pro_token($record)) {
             return $record;
         }
 
@@ -196,7 +255,7 @@ class license_manager {
                     $this->persist_license($record);
                 }
             } catch (\Throwable $ignore) {
-                // Ignore registration failures; retry later.
+                debugging($ignore->getMessage(), DEBUG_DEVELOPER);
             }
         }
 
@@ -219,17 +278,17 @@ class license_manager {
             }
             $domain = \local_inventario_normalize_domain($domain);
             $response = $this->client->validate_license((string)$record->apikey, $domain);
-        if (!empty($response['valid']) && $this->is_signed_response_valid($response, $token)) {
-            $record = $this->update_record_from_response($record, $response, $domain, $now);
-            return $this->persist_license($record);
-        }
+            if (!empty($response['valid']) && $this->is_signed_response_valid($response, $token)) {
+                $record = $this->update_record_from_response($record, $response, $domain, $now);
+                return $this->persist_license($record);
+            }
 
-        $record->status = 'free';
-        $record->lastpayload = !empty($response['message']) ? (string)$response['message'] : 'invalid_signature';
-    } catch (\Throwable $ex) {
-        $record->status = 'free';
-        $record->lastpayload = $ex->getMessage();
-    }
+            $record->status = 'free';
+            $record->lastpayload = !empty($response['message']) ? (string)$response['message'] : 'invalid_signature';
+        } catch (\Throwable $ex) {
+            $record->status = 'free';
+            $record->lastpayload = $ex->getMessage();
+        }
 
         $record->signature = null;
         $record->protoken = null;
@@ -239,6 +298,24 @@ class license_manager {
         $record->lastcheck = $now;
         $record->timemodified = $now;
         return $this->persist_license($record);
+    }
+
+    /**
+     * Ensure the configured endpoint belongs to an allowed host over HTTPS.
+     *
+     * @param string $endpoint
+     * @return bool
+     */
+    private function is_endpoint_allowed(string $endpoint): bool {
+        $parts = @parse_url($endpoint);
+        if (empty($parts['scheme']) || strtolower((string)$parts['scheme']) !== 'https') {
+            return false;
+        }
+        if (empty($parts['host'])) {
+            return false;
+        }
+        $host = strtolower((string)$parts['host']);
+        return in_array($host, self::ALLOWED_HOSTS, true);
     }
 
     /**
@@ -268,7 +345,7 @@ class license_manager {
         try {
             $status = $this->refresh(true);
         } catch (\Throwable $ignore) {
-            // Ignore refresh errors; we will throw below.
+            debugging($ignore->getMessage(), DEBUG_DEVELOPER);
         }
 
         if ($status->status === 'pro' && $this->validate_signature($status) && $this->has_valid_pro_token($status)) {
@@ -392,7 +469,7 @@ class license_manager {
      * Compute canonical signature for a payload.
      */
     private function sign(array $payload): string {
-        $secret = trim((string)get_config('local_inventario', 'apitoken'));
+        $secret = trim(secrets::apitoken());
         if ($secret === '') {
             return '';
         }
@@ -566,4 +643,3 @@ class license_manager {
         return true;
     }
 }
-

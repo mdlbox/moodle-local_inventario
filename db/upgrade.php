@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -21,8 +21,6 @@
  * @copyright 2025 mdlbox - https://app.mdlbox.com
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-
-defined('MOODLE_INTERNAL') || die();
 
 /**
  * Upgrade steps for local_inventario.
@@ -264,6 +262,46 @@ function xmldb_local_inventario_upgrade(int $oldversion): bool {
         }
         upgrade_plugin_savepoint(true, 2025120800, 'local', 'inventario');
     }
+
+    if ($oldversion < 2025121500) {
+        // Flag object types that require a physical return (default: yes to keep existing behaviour).
+        $table = new xmldb_table('local_inventario_types');
+        $field = new xmldb_field('requiresreturn', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, 1, 'color');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        upgrade_plugin_savepoint(true, 2025121500, 'local', 'inventario');
+    }
+
+    if ($oldversion < 2025122000) {
+        // Flag object types that need a usage location (default yes to preserve current behaviour).
+        $table = new xmldb_table('local_inventario_types');
+        $field = new xmldb_field('requireslocation', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, 1, 'requiresreturn');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        upgrade_plugin_savepoint(true, 2025122000, 'local', 'inventario');
+    }
+
+    if ($oldversion < 2025122200) {
+        $table = new xmldb_table('local_inventario_objects');
+        $enabled = new xmldb_field('availableperiodenabled', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, 0, 'status');
+        $from = new xmldb_field('availablefrom', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, 0, 'availableperiodenabled');
+        $to = new xmldb_field('availableto', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, 0, 'availablefrom');
+        $times = new xmldb_field('availabletimes', XMLDB_TYPE_TEXT, null, null, null, null, null, 'availableto');
+        if (!$dbman->field_exists($table, $enabled)) {
+            $dbman->add_field($table, $enabled);
+        }
+        if (!$dbman->field_exists($table, $from)) {
+            $dbman->add_field($table, $from);
+        }
+        if (!$dbman->field_exists($table, $to)) {
+            $dbman->add_field($table, $to);
+        }
+        if (!$dbman->field_exists($table, $times)) {
+            $dbman->add_field($table, $times);
+        }
+        upgrade_plugin_savepoint(true, 2025122200, 'local', 'inventario');
+    }
     return true;
 }
-

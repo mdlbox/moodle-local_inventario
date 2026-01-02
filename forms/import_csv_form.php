@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -34,6 +34,8 @@ class local_inventario_import_csv_form extends moodleform {
     private $kind;
 
     /**
+     * Initialise form with the target import kind.
+     *
      * @param string $action
      * @param array $customdata
      */
@@ -59,4 +61,3 @@ class local_inventario_import_csv_form extends moodleform {
         $this->add_action_buttons(true, get_string('importcsv', 'local_inventario'));
     }
 }
-

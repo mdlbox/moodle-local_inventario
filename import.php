@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -32,7 +32,7 @@ require_capability('local/inventario:manageobjects', $context);
 
 $license = local_inventario_license()->refresh();
 if ($license->status !== 'pro' || empty($license->apikey)) {
-    print_error('prorequired', 'local_inventario');
+    throw new moodle_exception('prorequired', 'local_inventario');
 }
 
 $exportkind = optional_param('export', '', PARAM_ALPHA);
@@ -66,7 +66,7 @@ foreach ($forms as $kind => $form) {
     if ($data = $form->get_data()) {
         $tempfile = $form->save_temp_file('csvfile');
         if (!$tempfile) {
-            print_error('nofile');
+            throw new moodle_exception('nofile');
         }
         switch ($kind) {
             case 'properties':
@@ -100,28 +100,46 @@ echo html_writer::start_div('row g-4');
 
 echo html_writer::start_div('col-md-4');
 echo html_writer::tag('h3', get_string('importpropertiescsv', 'local_inventario'));
-echo html_writer::div(html_writer::link(new moodle_url($PAGE->url, ['template' => 'properties']),
-    get_string('downloadtemplate', 'local_inventario'), ['class' => 'btn btn-link p-0']));
-echo html_writer::div(html_writer::link(new moodle_url($PAGE->url, ['export' => 'properties']),
-    get_string('exportpropertiescsv', 'local_inventario'), ['class' => 'btn btn-link p-0']));
+echo html_writer::div(html_writer::link(
+    new moodle_url($PAGE->url, ['template' => 'properties']),
+    get_string('downloadtemplate', 'local_inventario'),
+    ['class' => 'btn btn-secondary']
+));
+echo html_writer::div(html_writer::link(
+    new moodle_url($PAGE->url, ['export' => 'properties']),
+    get_string('exportpropertiescsv', 'local_inventario'),
+    ['class' => 'btn btn-secondary']
+));
 $forms['properties']->display();
 echo html_writer::end_div();
 
 echo html_writer::start_div('col-md-4');
 echo html_writer::tag('h3', get_string('importtypescsv', 'local_inventario'));
-echo html_writer::div(html_writer::link(new moodle_url($PAGE->url, ['template' => 'types']),
-    get_string('downloadtemplate', 'local_inventario'), ['class' => 'btn btn-link p-0']));
-echo html_writer::div(html_writer::link(new moodle_url($PAGE->url, ['export' => 'types']),
-    get_string('exporttypescsv', 'local_inventario'), ['class' => 'btn btn-link p-0']));
+echo html_writer::div(html_writer::link(
+    new moodle_url($PAGE->url, ['template' => 'types']),
+    get_string('downloadtemplate', 'local_inventario'),
+    ['class' => 'btn btn-secondary']
+));
+echo html_writer::div(html_writer::link(
+    new moodle_url($PAGE->url, ['export' => 'types']),
+    get_string('exporttypescsv', 'local_inventario'),
+    ['class' => 'btn btn-secondary']
+));
 $forms['types']->display();
 echo html_writer::end_div();
 
 echo html_writer::start_div('col-md-4');
 echo html_writer::tag('h3', get_string('importobjectscsv', 'local_inventario'));
-echo html_writer::div(html_writer::link(new moodle_url($PAGE->url, ['template' => 'objects']),
-    get_string('downloadtemplate', 'local_inventario'), ['class' => 'btn btn-link p-0']));
-echo html_writer::div(html_writer::link(new moodle_url($PAGE->url, ['export' => 'objects']),
-    get_string('exportobjectscsv', 'local_inventario'), ['class' => 'btn btn-link p-0']));
+echo html_writer::div(html_writer::link(
+    new moodle_url($PAGE->url, ['template' => 'objects']),
+    get_string('downloadtemplate', 'local_inventario'),
+    ['class' => 'btn btn-secondary']
+));
+echo html_writer::div(html_writer::link(
+    new moodle_url($PAGE->url, ['export' => 'objects']),
+    get_string('exportobjectscsv', 'local_inventario'),
+    ['class' => 'btn btn-secondary']
+));
 $forms['objects']->display();
 echo html_writer::end_div();
 
@@ -152,7 +170,7 @@ function local_inventario_output_import_template(string $kind): void {
     ];
 
     if (!isset($templates[$kind])) {
-        print_error('invalidaction', 'local_inventario');
+        throw new moodle_exception('invalidaction', 'local_inventario');
     }
 
     $filename = "inventario_{$kind}_template.csv";
@@ -160,7 +178,7 @@ function local_inventario_output_import_template(string $kind): void {
     header('Content-Disposition: attachment; filename="' . $filename . '"');
     $output = fopen('php://output', 'w');
     foreach ($templates[$kind] as $row) {
-        fputcsv($output, $row);
+        fputcsv($output, $row, ',', '"', '\\');
     }
     fclose($output);
     exit;
@@ -174,8 +192,11 @@ function local_inventario_output_import_template(string $kind): void {
  * @param \local_inventario\local\type_service $typeservice
  * @return void
  */
-function local_inventario_output_export_csv(string $kind, \local_inventario\local\inventory_service $service,
-        \local_inventario\local\type_service $typeservice): void {
+function local_inventario_output_export_csv(
+    string $kind,
+    \local_inventario\local\inventory_service $service,
+    \local_inventario\local\type_service $typeservice
+): void {
     global $DB;
 
     switch ($kind) {
@@ -250,17 +271,16 @@ function local_inventario_output_export_csv(string $kind, \local_inventario\loca
             $filename = 'inventario_objects_export.csv';
             break;
         default:
-            print_error('invalidaction', 'local_inventario');
+            throw new moodle_exception('invalidaction', 'local_inventario');
     }
 
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
     $output = fopen('php://output', 'w');
-    fputcsv($output, $headers);
+    fputcsv($output, $headers, ',', '"', '\\');
     foreach ($rows as $row) {
-        fputcsv($output, $row);
+        fputcsv($output, $row, ',', '"', '\\');
     }
     fclose($output);
     exit;
 }
-

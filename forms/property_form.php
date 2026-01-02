@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -33,11 +33,19 @@ class local_inventario_property_form extends moodleform {
     /** @var array */
     private $parents;
 
+    /**
+     * Property form constructor.
+     *
+     * @param string $action
+     */
     public function __construct($action) {
         $this->parents = local_inventario_service()->get_properties();
         parent::__construct($action);
     }
 
+    /**
+     * Define form elements.
+     */
     public function definition() {
         $mform = $this->_form;
 
@@ -67,12 +75,29 @@ class local_inventario_property_form extends moodleform {
         $mform->addElement('select', 'parentid', get_string('parentproperty', 'local_inventario'), $parentoptions);
         $mform->setDefault('parentid', 0);
 
-        $mform->addElement('textarea', 'options', get_string('options', 'local_inventario'),
-            ['rows' => 3, 'cols' => 50]);
+        $mform->addElement(
+            'textarea',
+            'options',
+            get_string('options', 'local_inventario'),
+            ['rows' => 3, 'cols' => 50]
+        );
         $mform->setType('options', PARAM_TEXT);
         $mform->addHelpButton('options', 'options', 'local_inventario');
 
-        $mform->addElement('advcheckbox', 'required', get_string('requiredfield', 'local_inventario'));
+        $requiredel = $mform->createElement(
+            'advcheckbox',
+            'required',
+            '',
+            '',
+            ['class' => 'inventario-switch']
+        );
+        $mform->addGroup(
+            [$requiredel],
+            'required_group',
+            get_string('requiredfield', 'local_inventario'),
+            '',
+            false
+        );
 
         $mform->addElement('text', 'sortorder', get_string('sortorder', 'local_inventario'), ['size' => 5]);
         $mform->setType('sortorder', PARAM_INT);

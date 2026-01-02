@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -31,6 +31,10 @@
  */
 
 defined('MOODLE_INTERNAL') || die();
+
+require_once(__DIR__ . '/classes/local/license_manager.php');
+require_once(__DIR__ . '/classes/local/inventory_service.php');
+require_once(__DIR__ . '/classes/local/type_service.php');
 
 use local_inventario\local\inventory_service;
 use local_inventario\local\license_manager;
@@ -105,40 +109,86 @@ function local_inventario_render_nav(\context_system $context): string {
     $hasapikey = !empty($licensestatus->apikey);
     $activeurl = (!empty($PAGE) && $PAGE->url instanceof moodle_url) ? $PAGE->url->out_as_local_url(false) : null;
 
-    $links = [];
-    // Inventario dashboard (visibile a chi prenota o gestisce).
-    if ($canreserve || $manager) {
-        $links[] = ['/local/inventario/index.php', 'pluginname'];
-    }
-    if ($manager) {
-        $links[] = ['/local/inventario/objects.php', 'manageobjects'];
-        $links[] = ['/local/inventario/types.php', 'managetypes'];
-        $links[] = ['/local/inventario/sites.php', 'managesites'];
-        $links[] = ['/local/inventario/properties.php', 'manageproperties'];
-        $links[] = ['/local/inventario/license.php', 'license'];
-    }
-    if ($canreserve || $manager) {
-        $links[] = ['/local/inventario/reservations.php', 'reservations'];
-        $links[] = ['/local/inventario/reservations_list.php', 'reservationslist'];
-        if ($ispro) {
-            $links[] = ['/local/inventario/reservations_calendar.php', 'reservationscalendar'];
-        }
-    }
-    if ($manager && $ispro && $hasapikey) {
-        $links[] = ['/local/inventario/import.php', 'importcsv'];
-    }
+    // Define nav items in the required order.
+    $items = [
+        [
+            'path' => '/local/inventario/index.php',
+            'label' => html_writer::span('', 'fa-solid fa-warehouse', ['aria-hidden' => 'true']) .
+                html_writer::span(get_string('pluginname', 'local_inventario'), 'sr-only'),
+            'show' => ($canreserve || $manager),
+        ],
+        [
+            'path' => '/local/inventario/properties.php',
+            'label' => html_writer::span('', 'fa-solid fa-list-check me-1', ['aria-hidden' => 'true']) .
+                get_string('nav_props', 'local_inventario'),
+            'show' => $manager,
+        ],
+        [
+            'path' => '/local/inventario/types.php',
+            'label' => html_writer::span('', 'fa-solid fa-layer-group me-1', ['aria-hidden' => 'true']) .
+                get_string('nav_types', 'local_inventario'),
+            'show' => $manager,
+        ],
+        [
+            'path' => '/local/inventario/objects.php',
+            'label' => html_writer::span('', 'fa-solid fa-boxes-stacked me-1', ['aria-hidden' => 'true']) .
+                get_string('nav_objects', 'local_inventario'),
+            'show' => $manager,
+        ],
+        [
+            'path' => '/local/inventario/sites.php',
+            'label' => html_writer::span('', 'fa-solid fa-location-dot me-1', ['aria-hidden' => 'true']) .
+                get_string('nav_sites', 'local_inventario'),
+            'show' => $manager,
+        ],
+        [
+            'path' => '/local/inventario/reservations.php',
+            'label' => html_writer::span('', 'fa-solid fa-calendar-check me-1', ['aria-hidden' => 'true']) .
+                get_string('nav_booking', 'local_inventario'),
+            'show' => ($canreserve || $manager),
+        ],
+        [
+            'path' => '/local/inventario/reservations_list.php',
+            'label' => html_writer::span('', 'fa fa-list-ul me-1', ['aria-hidden' => 'true']) .
+                get_string('nav_list', 'local_inventario'),
+            'show' => ($canreserve || $manager),
+        ],
+        [
+            'path' => '/local/inventario/reservations_calendar.php',
+            'label' => html_writer::span('', 'fa fa-calendar me-1', ['aria-hidden' => 'true']) .
+                get_string('nav_calendar', 'local_inventario'),
+            'show' => ($canreserve || $manager) && $ispro,
+        ],
+        [
+            'path' => '/local/inventario/import.php',
+            'label' => html_writer::span('', 'fa fa-file-import me-1', ['aria-hidden' => 'true']) .
+                html_writer::span('', 'fa fa-file-export me-1', ['aria-hidden' => 'true']) .
+                get_string('nav_csv', 'local_inventario'),
+            'show' => $manager && $ispro && $hasapikey,
+        ],
+        [
+            'path' => '/local/inventario/license.php',
+            'label' => html_writer::span('', 'fa-solid fa-key me-1', ['aria-hidden' => 'true']) .
+                get_string('nav_license', 'local_inventario'),
+            'show' => $manager,
+        ],
+    ];
 
-    if (empty($links)) {
+    $buttonsdata = array_filter($items, static function ($item) {
+        return !empty($item['show']);
+    });
+
+    if (empty($buttonsdata)) {
         return '';
     }
 
     $buttons = [];
-    foreach ($links as [$path, $str]) {
-        $url = new moodle_url($path);
-        $label = get_string($str, 'local_inventario');
+    foreach ($buttonsdata as $item) {
+        $url = new moodle_url($item['path']);
+        $label = $item['label'];
         $targeturl = $url->out_as_local_url(false);
         $isactive = $activeurl && (strpos($activeurl, $targeturl) === 0);
-        $classes = 'btn btn-sm me-2 mb-2 ' . ($isactive ? 'btn-primary active' : 'btn-outline-secondary');
+        $classes = 'btn me-2 mb-2 ' . ($isactive ? 'btn-primary active' : 'btn-secondary');
         $attrs = ['class' => $classes];
         if ($isactive) {
             $attrs['aria-current'] = 'page';
@@ -263,8 +313,11 @@ function local_inventario_type_options(): array {
  */
 function local_inventario_user_options(): array {
     $context = context_system::instance();
-    $users = get_users_by_capability($context, 'local/inventario:reserve',
-        'u.id, u.firstname, u.lastname, u.firstnamephonetic, u.lastnamephonetic, u.middlename, u.alternatename');
+    $users = get_users_by_capability(
+        $context,
+        'local/inventario:reserve',
+        'u.id, u.firstname, u.lastname, u.firstnamephonetic, u.lastnamephonetic, u.middlename, u.alternatename'
+    );
     $options = [];
     foreach ($users as $user) {
         $options[$user->id] = fullname($user);
@@ -276,6 +329,22 @@ function local_inventario_user_options(): array {
  * Determine if the current user may see hidden objects.
  */
 function local_inventario_can_see_hidden(): bool {
-    return has_capability('local/inventario:togglevisibility', context_system::instance());
+    $context = context_system::instance();
+    return has_capability('local/inventario:togglevisibility', $context)
+        || has_capability('local/inventario:manageobjects', $context);
 }
 
+/**
+ * Wrapper to check if a feature is enabled based on license.
+ *
+ * @param string $feature
+ * @return bool
+ */
+function local_inventario_feature_enabled(string $feature): bool {
+    try {
+        return local_inventario_license()->is_feature_enabled($feature);
+    } catch (\Throwable $e) {
+        debugging($e->getMessage(), DEBUG_DEVELOPER);
+        return false;
+    }
+}

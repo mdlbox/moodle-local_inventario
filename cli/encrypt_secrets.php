@@ -15,26 +15,26 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Renderer for local_inventario.
+ * CLI helper to encrypt endpoint/token values with the hardcoded master key.
  *
  * @package   local_inventario
- * @copyright 2025 mdlbox - https://app.mdlbox.com
+ * @copyright 2025 mdlbox
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-use local_inventario\output\dashboard;
+define('CLI_SCRIPT', true);
+define('MOODLE_INTERNAL', true);
 
-/**
- * Custom renderer for local_inventario.
- */
-class local_inventario_renderer extends plugin_renderer_base {
-    /**
-     * Render the dashboard renderable.
-     *
-     * @param dashboard $dashboard
-     * @return string
-     */
-    public function render_dashboard(dashboard $dashboard): string {
-        return $this->render_from_template('local_inventario/dashboard', $dashboard->export_for_template($this));
-    }
+require_once(__DIR__ . '/../classes/local/secrets.php');
+
+use local_inventario\local\secrets;
+
+if ($argc < 2) {
+    fwrite(STDERR, "Usage: php encrypt_secrets.php \"value\"\n");
+    exit(1);
 }
+
+$value = (string)$argv[1];
+$cipher = secrets::encrypt($value);
+
+fwrite(STDOUT, $cipher . PHP_EOL);

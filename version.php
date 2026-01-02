@@ -1,5 +1,4 @@
-﻿<?php
-
+<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -14,7 +13,10 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
 /**
+ * Version information for the Inventario plugin.
+ *
  * @package   local_inventario
  * @copyright 2025 mdlbox - https://app.mdlbox.com
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -23,9 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_inventario';
-$plugin->version   = 2025120800;
+$plugin->version   = 2025122201;
 $plugin->requires  = 2022041200; // Moodle 4.0.
 $plugin->supported = [400, 510]; // 4.0, 5.1.
-$plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = '1.0.0';
-
+$plugin->maturity  = MATURITY_STABLE;
+$plugin->release   = '1.0.1';
