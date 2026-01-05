@@ -34,6 +34,7 @@ $license = local_inventario_license()->refresh();
 $id = optional_param('id', 0, PARAM_INT);
 $returnid = optional_param('return', 0, PARAM_INT);
 $delete = optional_param('delete', 0, PARAM_INT);
+$confirm = optional_param('confirm', 0, PARAM_BOOL);
 $sitefilter = optional_param('siteid', 0, PARAM_INT);
 $focus = optional_param('focus', 0, PARAM_INT);
 $objectidparam = optional_param('objectid', 0, PARAM_INT);
@@ -67,14 +68,54 @@ $allowperiodic = (bool)get_config('local_inventario', 'allowperiodic') && local_
 $overlaperror = '';
 $expiredwarning = '';
 
-if ($returnid && confirm_sesskey()) {
-    $service->return_reservation($returnid, $USER->id, $canmanageall);
-    redirect($PAGE->url, get_string('reservationreturned', 'local_inventario'));
+if ($returnid) {
+    require_sesskey();
+    $reservation = $DB->get_record('local_inventario_reserv', ['id' => $returnid], '*', MUST_EXIST);
+    if (!$canmanageall && $reservation->userid != $USER->id) {
+        throw new moodle_exception('notyours', 'local_inventario');
+    }
+    if ($confirm) {
+        $service->return_reservation($returnid, $USER->id, $canmanageall);
+        redirect($PAGE->url, get_string('reservationreturned', 'local_inventario'));
+    }
+    $object = $DB->get_record('local_inventario_objects', ['id' => $reservation->objectid], 'id,name');
+    $resname = $object ? $object->name : $reservation->id;
+    $yesurl = new moodle_url($PAGE->url, ['return' => $returnid, 'confirm' => 1, 'sesskey' => sesskey()]);
+    $nourl = new moodle_url($PAGE->url);
+    echo $OUTPUT->header();
+    echo local_inventario_render_nav($context);
+    echo $OUTPUT->confirm(
+        get_string('confirmreturn', 'local_inventario', format_string($resname)),
+        $yesurl,
+        $nourl
+    );
+    echo $OUTPUT->footer();
+    exit;
 }
 
-if ($delete && confirm_sesskey()) {
-    $service->delete_reservation($delete, $USER->id, $canmanageall);
-    redirect($PAGE->url, get_string('reservationdeleted', 'local_inventario'));
+if ($delete) {
+    require_sesskey();
+    $reservation = $DB->get_record('local_inventario_reserv', ['id' => $delete], '*', MUST_EXIST);
+    if (!$canmanageall && $reservation->userid != $USER->id) {
+        throw new moodle_exception('notyours', 'local_inventario');
+    }
+    if ($confirm) {
+        $service->delete_reservation($delete, $USER->id, $canmanageall);
+        redirect($PAGE->url, get_string('reservationdeleted', 'local_inventario'));
+    }
+    $object = $DB->get_record('local_inventario_objects', ['id' => $reservation->objectid], 'id,name');
+    $resname = $object ? $object->name : $reservation->id;
+    $yesurl = new moodle_url($PAGE->url, ['delete' => $delete, 'confirm' => 1, 'sesskey' => sesskey()]);
+    $nourl = new moodle_url($PAGE->url);
+    echo $OUTPUT->header();
+    echo local_inventario_render_nav($context);
+    echo $OUTPUT->confirm(
+        get_string('confirmdeletereservation', 'local_inventario', format_string($resname)),
+        $yesurl,
+        $nourl
+    );
+    echo $OUTPUT->footer();
+    exit;
 }
 
 $siteoptions = local_inventario_site_options();
@@ -361,10 +402,7 @@ foreach ($reservations as $reservation) {
                 $actions[] = html_writer::link(
                     $returnurl,
                     $returniconenabled,
-                    [
-                        'title' => get_string('returnobject', 'local_inventario'),
-                        'onclick' => "return confirm('" . get_string('confirmreturn', 'local_inventario') . "');",
-                    ]
+                    ['title' => get_string('returnobject', 'local_inventario')]
                 );
             } else {
                 $actions[] = html_writer::span($returnicondisabled, 'text-muted');
@@ -385,11 +423,7 @@ foreach ($reservations as $reservation) {
         // Delete.
         if (!$expired) {
             $deleteurl = new moodle_url($PAGE->url, ['delete' => $reservation->id, 'sesskey' => sesskey()]);
-            $actions[] = html_writer::link(
-                $deleteurl,
-                $deleteicon,
-                ['onclick' => "return confirm('" . get_string('confirmdelete') . "');"]
-            );
+            $actions[] = html_writer::link($deleteurl, $deleteicon);
         } else {
             $actions[] = html_writer::span($deleteicon, 'text-muted');
         }

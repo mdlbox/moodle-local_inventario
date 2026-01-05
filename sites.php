@@ -33,6 +33,7 @@ require_capability('local/inventario:managesites', $context);
 $license = local_inventario_license()->refresh();
 $id = optional_param('id', 0, PARAM_INT);
 $delete = optional_param('delete', 0, PARAM_INT);
+$confirm = optional_param('confirm', 0, PARAM_BOOL);
 
 $PAGE->set_url('/local/inventario/sites.php', ['id' => $id]);
 $PAGE->set_context($context);
@@ -41,9 +42,24 @@ $PAGE->set_heading(get_string('managesites', 'local_inventario'));
 
 $service = local_inventario_service();
 
-if ($delete && confirm_sesskey()) {
-    $service->delete_site($delete);
-    redirect($PAGE->url, get_string('sitedeleted', 'local_inventario'));
+if ($delete) {
+    require_sesskey();
+    $site = $DB->get_record('local_inventario_sites', ['id' => $delete], '*', MUST_EXIST);
+    if ($confirm) {
+        $service->delete_site($delete);
+        redirect($PAGE->url, get_string('sitedeleted', 'local_inventario'));
+    }
+    $yesurl = new moodle_url($PAGE->url, ['delete' => $delete, 'confirm' => 1, 'sesskey' => sesskey()]);
+    $nourl = new moodle_url($PAGE->url);
+    echo $OUTPUT->header();
+    echo local_inventario_render_nav($context);
+    echo $OUTPUT->confirm(
+        get_string('confirmdeletesite', 'local_inventario', format_string($site->name)),
+        $yesurl,
+        $nourl
+    );
+    echo $OUTPUT->footer();
+    exit;
 }
 
 $form = new local_inventario_site_form($PAGE->url);

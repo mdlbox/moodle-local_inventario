@@ -32,6 +32,7 @@ require_capability('local/inventario:manageobjects', $context);
 
 $id = optional_param('id', 0, PARAM_INT);
 $delete = optional_param('delete', 0, PARAM_INT);
+$confirm = optional_param('confirm', 0, PARAM_BOOL);
 
 $PAGE->set_url('/local/inventario/types.php', ['id' => $id]);
 $PAGE->set_context($context);
@@ -49,9 +50,24 @@ if ($form->is_cancelled()) {
     redirect(new moodle_url('/local/inventario/index.php'));
 }
 
-if ($delete && confirm_sesskey()) {
-    $typeservice->delete_type($delete);
-    redirect($PAGE->url, get_string('typedeleted', 'local_inventario'));
+if ($delete) {
+    require_sesskey();
+    $type = $DB->get_record('local_inventario_types', ['id' => $delete], '*', MUST_EXIST);
+    if ($confirm) {
+        $typeservice->delete_type($delete);
+        redirect($PAGE->url, get_string('typedeleted', 'local_inventario'));
+    }
+    $yesurl = new moodle_url($PAGE->url, ['delete' => $delete, 'confirm' => 1, 'sesskey' => sesskey()]);
+    $nourl = new moodle_url($PAGE->url);
+    echo $OUTPUT->header();
+    echo local_inventario_render_nav($context);
+    echo $OUTPUT->confirm(
+        get_string('confirmdeletetype', 'local_inventario', format_string($type->name)),
+        $yesurl,
+        $nourl
+    );
+    echo $OUTPUT->footer();
+    exit;
 }
 
 if ($data = $form->get_data()) {

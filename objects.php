@@ -34,6 +34,7 @@ $id = optional_param('id', 0, PARAM_INT);
 $action = optional_param('action', '', PARAM_ALPHA);
 $toggleid = optional_param('toggle', 0, PARAM_INT);
 $delete = optional_param('delete', 0, PARAM_INT);
+$confirm = optional_param('confirm', 0, PARAM_BOOL);
 $typeidparam = optional_param('typeid', -1, PARAM_INT);
 
 $PAGE->set_url('/local/inventario/objects.php');
@@ -57,10 +58,25 @@ if (empty($typeoptions)) {
     exit;
 }
 
-if ($delete && confirm_sesskey()) {
-    local_inventario_service()->delete_object($delete);
-    $redirect = new moodle_url('/local/inventario/objects.php');
-    redirect($redirect, get_string('objectdeleted', 'local_inventario'));
+if ($delete) {
+    require_sesskey();
+    $objtodelete = $DB->get_record('local_inventario_objects', ['id' => $delete], 'id,name', MUST_EXIST);
+    if ($confirm) {
+        local_inventario_service()->delete_object($delete);
+        $redirect = new moodle_url('/local/inventario/objects.php');
+        redirect($redirect, get_string('objectdeleted', 'local_inventario'));
+    }
+    $yesurl = new moodle_url($PAGE->url, ['delete' => $delete, 'confirm' => 1, 'sesskey' => sesskey()]);
+    $nourl = new moodle_url('/local/inventario/objects.php');
+    echo $OUTPUT->header();
+    echo local_inventario_render_nav($context);
+    echo $OUTPUT->confirm(
+        get_string('confirmdeleteobject', 'local_inventario', format_string($objtodelete->name)),
+        $yesurl,
+        $nourl
+    );
+    echo $OUTPUT->footer();
+    exit;
 }
 
 if ($toggleid && confirm_sesskey()) {
@@ -202,11 +218,7 @@ foreach ($objects as $object) {
     } else {
         $actions[] = get_string('proonly', 'local_inventario');
     }
-    $actions[] = html_writer::link(
-        $deleteurl,
-        $deleteicon,
-        ['onclick' => "return confirm('" . get_string('confirmdeleteobject', 'local_inventario') . "');"]
-    );
+    $actions[] = html_writer::link($deleteurl, $deleteicon);
     $row[] = implode(' ', $actions);
     $table->data[] = $row;
 }

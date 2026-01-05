@@ -33,6 +33,7 @@ require_capability('local/inventario:manageproperties', $context);
 $license = local_inventario_license()->refresh();
 $id = optional_param('id', 0, PARAM_INT);
 $delete = optional_param('delete', 0, PARAM_INT);
+$confirm = optional_param('confirm', 0, PARAM_BOOL);
 
 $PAGE->set_url('/local/inventario/properties.php', ['id' => $id]);
 $PAGE->set_context($context);
@@ -52,9 +53,24 @@ if ($data = $form->get_data()) {
     redirect($PAGE->url, get_string('changessaved'), 0);
 }
 
-if ($delete && confirm_sesskey()) {
-    $service->delete_property($delete);
-    redirect($PAGE->url, get_string('changessaved'), 0);
+if ($delete) {
+    require_sesskey();
+    $property = $DB->get_record('local_inventario_properties', ['id' => $delete], '*', MUST_EXIST);
+    if ($confirm) {
+        $service->delete_property($delete);
+        redirect($PAGE->url, get_string('changessaved'), 0);
+    }
+    $yesurl = new moodle_url($PAGE->url, ['delete' => $delete, 'confirm' => 1, 'sesskey' => sesskey()]);
+    $nourl = new moodle_url($PAGE->url);
+    echo $OUTPUT->header();
+    echo local_inventario_render_nav($context);
+    echo $OUTPUT->confirm(
+        get_string('confirmdeleteproperty', 'local_inventario', format_string($property->name)),
+        $yesurl,
+        $nourl
+    );
+    echo $OUTPUT->footer();
+    exit;
 }
 
 if ($id) {
@@ -81,11 +97,13 @@ foreach ($properties as $prop) {
 
 $accordion = '';
 foreach ($parents as $parent) {
+    $editicon = $OUTPUT->pix_icon('t/edit', get_string('edit'));
+    $deleteicon = $OUTPUT->pix_icon('t/delete', get_string('delete'));
     $parentactions = [
-        html_writer::link(new moodle_url($PAGE->url, ['id' => $parent->id]), get_string('edit')),
+        html_writer::link(new moodle_url($PAGE->url, ['id' => $parent->id]), $editicon),
         html_writer::link(
             new moodle_url($PAGE->url, ['delete' => $parent->id, 'sesskey' => sesskey()]),
-            get_string('delete')
+            $deleteicon
         ),
     ];
     $accordion .= html_writer::start_tag('div', ['class' => 'accordion-item mb-2']);
@@ -105,10 +123,10 @@ foreach ($parents as $parent) {
         $accordion .= html_writer::start_tag('ul', ['class' => 'list-unstyled ms-3']);
         foreach ($children[$parent->id] as $child) {
             $childactions = [
-                html_writer::link(new moodle_url($PAGE->url, ['id' => $child->id]), get_string('edit')),
+                html_writer::link(new moodle_url($PAGE->url, ['id' => $child->id]), $editicon),
                 html_writer::link(
                     new moodle_url($PAGE->url, ['delete' => $child->id, 'sesskey' => sesskey()]),
-                    get_string('delete')
+                    $deleteicon
                 ),
             ];
             $accordion .= html_writer::tag(
