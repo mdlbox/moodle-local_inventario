@@ -295,6 +295,21 @@ class inventory_service {
         if (empty($record->name) || empty($record->shortname)) {
             throw new moodle_exception('invalidproperty', 'local_inventario');
         }
+
+        // Avoid duplicate names or shortnames.
+        $excludeid = !empty($data->id) ? (int)$data->id : 0;
+        $existingname = $DB->record_exists_sql(
+            "SELECT 1 FROM {local_inventario_properties} WHERE LOWER(name) = LOWER(?) AND id <> ?",
+            [$record->name, $excludeid]
+        );
+        $existingshort = $DB->record_exists_sql(
+            "SELECT 1 FROM {local_inventario_properties} WHERE LOWER(shortname) = LOWER(?) AND id <> ?",
+            [$record->shortname, $excludeid]
+        );
+        if ($existingname || $existingshort) {
+            throw new moodle_exception('propertyduplicate', 'local_inventario');
+        }
+
         if (!empty($data->id)) {
             $record->id = (int)$data->id;
             $DB->update_record('local_inventario_properties', $record);

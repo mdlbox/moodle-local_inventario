@@ -1,7 +1,9 @@
 /**
  * Objects page interactions.
  *
- * @module local_inventario/objects
+ * @module     local_inventario/objects
+ * @copyright  2025 mdlbox - https://app.mdlbox.com
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 define([], function() {
     const buildUrl = (baseurl, params) => {

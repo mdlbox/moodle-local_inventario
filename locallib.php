@@ -224,13 +224,16 @@ function local_inventario_create_booking_role(): void {
     }
 
     $shortname = 'inventario_booking';
-    $name = 'Prenotazione da inventario';
-    $description = 'Ruolo globale per prenotare oggetti Inventario e vedere le statistiche.';
+    $name = get_string('role_inventario_booking', 'local_inventario');
+    $description = get_string('role_inventario_booking_desc', 'local_inventario');
 
     if (!$role = $DB->get_record('role', ['shortname' => $shortname])) {
         $roleid = create_role($name, $shortname, $description);
     } else {
         $roleid = $role->id;
+        // Keep name/description in sync with language strings.
+        $DB->set_field('role', 'name', $name, ['id' => $roleid]);
+        $DB->set_field('role', 'description', $description, ['id' => $roleid]);
     }
 
     // Restrict role to system context.

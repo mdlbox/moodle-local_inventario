@@ -103,12 +103,12 @@ echo html_writer::tag('h3', get_string('importpropertiescsv', 'local_inventario'
 echo html_writer::div(html_writer::link(
     new moodle_url($PAGE->url, ['template' => 'properties']),
     get_string('downloadtemplate', 'local_inventario'),
-    ['class' => 'btn btn-secondary']
+    ['class' => 'btn btn-secondary me-2 mb-2']
 ));
 echo html_writer::div(html_writer::link(
     new moodle_url($PAGE->url, ['export' => 'properties']),
     get_string('exportpropertiescsv', 'local_inventario'),
-    ['class' => 'btn btn-secondary']
+    ['class' => 'btn btn-secondary me-2 mb-2']
 ));
 $forms['properties']->display();
 echo html_writer::end_div();
@@ -118,12 +118,12 @@ echo html_writer::tag('h3', get_string('importtypescsv', 'local_inventario'));
 echo html_writer::div(html_writer::link(
     new moodle_url($PAGE->url, ['template' => 'types']),
     get_string('downloadtemplate', 'local_inventario'),
-    ['class' => 'btn btn-secondary']
+    ['class' => 'btn btn-secondary me-2 mb-2']
 ));
 echo html_writer::div(html_writer::link(
     new moodle_url($PAGE->url, ['export' => 'types']),
     get_string('exporttypescsv', 'local_inventario'),
-    ['class' => 'btn btn-secondary']
+    ['class' => 'btn btn-secondary me-2 mb-2']
 ));
 $forms['types']->display();
 echo html_writer::end_div();
@@ -133,12 +133,12 @@ echo html_writer::tag('h3', get_string('importobjectscsv', 'local_inventario'));
 echo html_writer::div(html_writer::link(
     new moodle_url($PAGE->url, ['template' => 'objects']),
     get_string('downloadtemplate', 'local_inventario'),
-    ['class' => 'btn btn-secondary']
+    ['class' => 'btn btn-secondary me-2 mb-2']
 ));
 echo html_writer::div(html_writer::link(
     new moodle_url($PAGE->url, ['export' => 'objects']),
     get_string('exportobjectscsv', 'local_inventario'),
-    ['class' => 'btn btn-secondary']
+    ['class' => 'btn btn-secondary me-2 mb-2']
 ));
 $forms['objects']->display();
 echo html_writer::end_div();

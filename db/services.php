@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version information for the Inventario plugin.
+ * Services definition for local_inventario.
  *
  * @package   local_inventario
  * @copyright 2025 mdlbox - https://app.mdlbox.com
@@ -24,9 +24,25 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->component = 'local_inventario';
-$plugin->version   = 2025122221;
-$plugin->requires  = 2022041200; // Moodle 4.0.
-$plugin->supported = [400, 510]; // 4.0, 5.1.
-$plugin->maturity  = MATURITY_STABLE;
-$plugin->release   = '1.0.21';
+$functions = [
+    'local_inventario_toggle_visibility' => [
+        'classname'   => 'local_inventario_external',
+        'methodname'  => 'toggle_visibility',
+        'classpath'   => 'local/inventario/externallib.php',
+        'description' => 'Toggle object visibility',
+        'type'        => 'write',
+        'capabilities'=> 'local/inventario:togglevisibility',
+        'ajax'        => true,
+    ],
+    'local_inventario_refresh_license' => [
+        'classname'   => 'local_inventario_external',
+        'methodname'  => 'refresh_license',
+        'classpath'   => 'local/inventario/externallib.php',
+        'description' => 'Force refresh of license data',
+        'type'        => 'write',
+        'capabilities'=> 'local/inventario:managelicense',
+        'ajax'        => true,
+    ],
+];
+
+$services = [];

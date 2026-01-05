@@ -58,26 +58,8 @@ $PAGE->set_context($context);
 $PAGE->set_title(get_string('pluginname', 'local_inventario'));
 $PAGE->set_heading(get_string('pluginname', 'local_inventario'));
 $PAGE->requires->css('/local/inventario/styles.css');
-$PAGE->requires->js_call_amd('local_inventario/dashboard', 'init', [
-    'toggleurl' => (new moodle_url('/local/inventario/ajax.php'))->out(false),
-    'sesskey' => sesskey(),
-]);
-$PAGE->requires->js_init_code("
-require(['jquery'], function($) {
-    const modal = $('#inventario-object-modal');
-    const modalBody = $('#inventario-object-modal-body');
-    const modalTitle = $('#inventario-object-modal .modal-title');
-    $(document).on('click', '.inventario-object-info', function(e) {
-        e.preventDefault();
-        const targetId = $(this).data('detail-id');
-        const title = $(this).data('detail-title') || '';
-        const content = $('#' + targetId).html() || '';
-        modalTitle.text(title || '" . get_string('info') . "');
-        modalBody.html(content);
-        modal.modal('show');
-    });
-});
-");
+$PAGE->requires->js_call_amd('local_inventario/dashboard', 'init');
+$PAGE->requires->js_call_amd('local_inventario/objectmodal', 'init');
 
 $licensemanager = local_inventario_license();
 $license = $licensemanager->refresh();

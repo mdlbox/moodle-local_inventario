@@ -451,13 +451,25 @@ echo html_writer::tag(
         'div',
         html_writer::tag(
             'div',
-            html_writer::tag('div', get_string('error'), ['class' => 'modal-header']) .
+            html_writer::tag(
+                'div',
+                get_string('error') .
+                html_writer::tag('button', '', [
+                    'type' => 'button',
+                    'class' => 'btn-close',
+                    'data-bs-dismiss' => 'modal',
+                    'data-dismiss' => 'modal',
+                    'aria-label' => get_string('closebuttontitle'),
+                ]),
+                ['class' => 'modal-header d-flex justify-content-between align-items-center']
+            ) .
             html_writer::tag('div', '', ['class' => 'modal-body', 'id' => 'inventario-overlap-modal-body']) .
             html_writer::tag(
                 'div',
                 html_writer::tag('button', get_string('closebuttontitle'), [
                     'type' => 'button',
                     'class' => 'btn btn-secondary',
+                    'data-bs-dismiss' => 'modal',
                     'data-dismiss' => 'modal',
                 ]),
                 ['class' => 'modal-footer']

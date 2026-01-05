@@ -35,6 +35,8 @@ require_once(__DIR__ . '/secrets.php');
  * License manager that validates signed responses and enforces limits.
  */
 class license_manager {
+    /** Default Free API key shipped with the plugin for baseline usage. */
+    private const DEFAULT_FREE_KEY = '95b45fde6670f63efc07b51ec34f26d8';
     /** Seconds of slack before token expiry. */
     private const PROTOKEN_GRACE = 30;
     /** Maximum age (seconds) for signed responses. */
@@ -99,6 +101,16 @@ class license_manager {
      */
     public function get_limits(): array {
         $status = $this->get_status();
+        $isdefaultkey = !empty($status->apikey) && $this->is_default_key($status->apikey);
+
+        // Force a periodic refresh for the bundled Free key to pick backend changes.
+        if ($isdefaultkey && (time() - (int)($status->lastcheck ?? 0)) > 900) {
+            try {
+                $status = $this->refresh(true);
+            } catch (\Throwable $ignore) {
+                debugging($ignore->getMessage(), DEBUG_DEVELOPER);
+            }
+        }
 
         // If Pro but token expired, refresh to recover full limits.
         if ($status->status === 'pro' && !$this->has_valid_pro_token($status)) {
@@ -110,12 +122,24 @@ class license_manager {
         }
 
         if (!$this->validate_signature($status)) {
+            if ($isdefaultkey) {
+                try {
+                    $status = $this->refresh(true);
+                } catch (\Throwable $ignore) {
+                    debugging($ignore->getMessage(), DEBUG_DEVELOPER);
+                }
+                if ($this->validate_signature($status)) {
+                    $limits = $this->decode_limits($status->limitsjson ?? '');
+                    $limits = $this->clamp_free_limits($limits);
+                    return $limits;
+                }
+            }
             return $this->fallback_limits();
         }
 
         $limits = $this->decode_limits($status->limitsjson ?? '');
         if ($status->status !== 'pro') {
-            $limits['allowhidden'] = false;
+            $limits = $this->clamp_free_limits($limits);
         }
         return $limits;
     }
@@ -168,6 +192,7 @@ class license_manager {
 
         $now = time();
         $domain = \local_inventario_current_domain();
+        $isdefaultkey = !empty($record->apikey) && $this->is_default_key($record->apikey);
 
         $changed = false;
         if (!empty($record->expiresat) && $record->expiresat < $now && $record->status !== 'free') {
@@ -175,7 +200,7 @@ class license_manager {
             $changed = true;
         }
 
-        if (!empty($record->domain) && $record->domain !== $domain && $record->status !== 'free') {
+        if (!empty($record->domain) && $record->domain !== $domain && $record->status !== 'free' && !$isdefaultkey) {
             $record->status = 'free';
             $changed = true;
         }
@@ -412,7 +437,7 @@ class license_manager {
         $domain = \local_inventario_current_domain();
 
         $record = (object)[
-            'apikey' => null,
+            'apikey' => self::DEFAULT_FREE_KEY,
             'domain' => $domain,
             'status' => 'free',
             'expiresat' => null,
@@ -575,6 +600,10 @@ class license_manager {
         $record->lastpayload = '';
         $record->lastcheck = $now;
         $record->timemodified = $now;
+        if (!empty($record->apikey) && $this->is_default_key($record->apikey)) {
+            // Allow the bundled Free key to work on any domain by aligning to the current caller domain.
+            $record->domain = $domain;
+        }
         return $record;
     }
 
@@ -618,12 +647,50 @@ class license_manager {
      */
     private function fallback_limits(): array {
         return [
-            'maxobjects' => 1,
-            'maxproperties' => 1,
+            'maxobjects' => 15,
+            'maxproperties' => 5,
             'allowhidden' => false,
             'periodicmax' => 0,
             'periodicgapdays' => 7,
         ];
+    }
+
+    /**
+     * Clamp Free-mode limits to safe defaults and disable hidden features.
+     *
+     * @param array $limits
+     * @return array
+     */
+    private function clamp_free_limits(array $limits): array {
+        $fallback = $this->fallback_limits();
+        $limits['allowhidden'] = false;
+        $limits['maxobjects'] = ($limits['maxobjects'] > 0)
+            ? min($limits['maxobjects'], $fallback['maxobjects'])
+            : $fallback['maxobjects'];
+        $limits['maxproperties'] = ($limits['maxproperties'] > 0)
+            ? min($limits['maxproperties'], $fallback['maxproperties'])
+            : $fallback['maxproperties'];
+        return $limits;
+    }
+
+    /**
+     * Return the bundled Free API key used during installation.
+     *
+     * @return string
+     */
+    public static function default_free_key(): string {
+        return self::DEFAULT_FREE_KEY;
+    }
+
+    /**
+     * Helper to check if a key matches the bundled Free key.
+     *
+     * @param string $key
+     * @return bool
+     */
+    private function is_default_key(string $key): bool {
+        $key = trim($key);
+        return $key !== '' && hash_equals(self::DEFAULT_FREE_KEY, $key);
     }
 
     /**

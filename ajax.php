@@ -25,37 +25,6 @@
 define('AJAX_SCRIPT', true);
 
 require_once(__DIR__ . '/../../config.php');
-require_once(__DIR__ . '/locallib.php');
 
-require_login();
-require_sesskey();
-
-$action = required_param('action', PARAM_ALPHANUMEXT);
-$context = context_system::instance();
-$response = ['success' => false];
-
-try {
-    switch ($action) {
-        case 'togglevisibility':
-            require_capability('local/inventario:togglevisibility', $context);
-            $id = required_param('id', PARAM_INT);
-            $visible = required_param('visible', PARAM_BOOL);
-            local_inventario_service()->toggle_visibility($id, $visible);
-            $response['success'] = true;
-            break;
-        case 'refreshlicense':
-            require_capability('local/inventario:managelicense', $context);
-            $license = local_inventario_license()->refresh(true);
-            $response['success'] = true;
-            $response['mode'] = $license->status;
-            break;
-        default:
-            throw new moodle_exception('invalidaction', 'local_inventario');
-    }
-} catch (Exception $e) {
-    $response['error'] = $e->getMessage();
-}
-
-header('Content-Type: application/json');
-echo json_encode($response);
-exit;
+// Deprecated: use external services (webservice AJAX) defined in db/services.php.
+throw new moodle_exception('deprecatedajax', 'local_inventario');

@@ -2,7 +2,9 @@
  * Reservations page interactions: filter objects by site, warn on unreturned objects,
  * and hide/show location based on type settings.
  *
- * @module local_inventario/reservations
+ * @module     local_inventario/reservations
+ * @copyright  2025 mdlbox - https://app.mdlbox.com
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 define([], function() {
 const init = (baseurl, recordid, unreturnedIds, objectMeta = {}) => {

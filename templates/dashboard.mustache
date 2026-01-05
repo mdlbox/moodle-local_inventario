@@ -1,3 +1,9 @@
+{{!
+    Dashboard template for local_inventario.
+    @template local_inventario/dashboard
+    @copyright 2025 mdlbox - https://app.mdlbox.com
+    @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+}}
 <div class="inventario-dashboard">
     <div class="d-flex justify-content-end">
         <details class="mb-3 inventario-license-details">
@@ -200,9 +206,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">{{#str}}info{{/str}}</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="{{#str}}closebuttontitle{{/str}}">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" data-dismiss="modal" aria-label="{{#str}}closebuttontitle{{/str}}"></button>
                 </div>
                 <div class="modal-body" id="inventario-object-modal-body"></div>
             </div>

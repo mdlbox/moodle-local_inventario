@@ -1,3 +1,11 @@
+/* 
+ * Styles for the Inventario plugin.
+ *
+ * @package   local_inventario
+ * @copyright 2025 mdlbox - https://app.mdlbox.com
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
 .inventario-filter-table {
     border-collapse: collapse;
     background: transparent;

@@ -134,18 +134,22 @@ function xmldb_local_inventario_upgrade(int $oldversion): bool {
     }
 
     if ($oldversion < 2025112313) {
-        // Force auto-increment on types/typeprops ids for MySQL installs that missed it.
-        $driver = $DB->get_dbfamily();
-        if ($driver === 'mysql') {
-            $DB->execute("ALTER TABLE {local_inventario_types} MODIFY id BIGINT(10) NOT NULL AUTO_INCREMENT");
-            $DB->execute("ALTER TABLE {local_inventario_typeprops} MODIFY id BIGINT(10) NOT NULL AUTO_INCREMENT");
+        // Enforce sequence/auto increment using XMLDB (cross-DB).
+        $typestable = new xmldb_table('local_inventario_types');
+        $typeidfield = new xmldb_field('id', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL, XMLDB_SEQUENCE);
+        if ($dbman->field_exists($typestable, $typeidfield)) {
+            $dbman->change_field_type($typestable, $typeidfield);
+        }
+
+        $typepropstable = new xmldb_table('local_inventario_typeprops');
+        $typepropidfield = new xmldb_field('id', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL, XMLDB_SEQUENCE);
+        if ($dbman->field_exists($typepropstable, $typepropidfield)) {
+            $dbman->change_field_type($typepropstable, $typepropidfield);
         }
         upgrade_plugin_savepoint(true, 2025112313, 'local', 'inventario');
     }
     if ($oldversion < 2025112314) {
         // Ensure correct primary keys and auto-increment on type tables.
-        $driver = $DB->get_dbfamily();
-
         // Types.
         $typestable = new xmldb_table('local_inventario_types');
         $idfield = new xmldb_field('id', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL, XMLDB_SEQUENCE);
@@ -161,7 +165,7 @@ function xmldb_local_inventario_upgrade(int $oldversion): bool {
             $dbman->create_table($typestable);
         }
         if ($driver === 'mysql') {
-            $DB->execute("ALTER TABLE {local_inventario_types} MODIFY id BIGINT(10) NOT NULL AUTO_INCREMENT");
+            // No driver-specific SQL required; XMLDB handles sequences/identity.
         }
 
         // Typeprops.
@@ -180,7 +184,7 @@ function xmldb_local_inventario_upgrade(int $oldversion): bool {
             $dbman->create_table($typepropstable);
         }
         if ($driver === 'mysql') {
-            $DB->execute("ALTER TABLE {local_inventario_typeprops} MODIFY id BIGINT(10) NOT NULL AUTO_INCREMENT");
+            // No driver-specific SQL required; XMLDB handles sequences/identity.
         }
 
         upgrade_plugin_savepoint(true, 2025112314, 'local', 'inventario');
@@ -302,6 +306,27 @@ function xmldb_local_inventario_upgrade(int $oldversion): bool {
             $dbman->add_field($table, $times);
         }
         upgrade_plugin_savepoint(true, 2025122200, 'local', 'inventario');
+    }
+
+    if ($oldversion < 2025122209) {
+        if (function_exists('local_inventario_create_booking_role')) {
+            local_inventario_create_booking_role();
+        }
+        upgrade_plugin_savepoint(true, 2025122209, 'local', 'inventario');
+    }
+
+    if ($oldversion < 2025122211) {
+        require_once(__DIR__ . '/../classes/local/license_manager.php');
+        $defaultkey = \local_inventario\local\license_manager::default_free_key();
+        $records = $DB->get_records_select('local_inventario_license', "apikey IS NULL OR apikey = ''");
+        $now = time();
+        foreach ($records as $record) {
+            $record->apikey = $defaultkey;
+            $record->status = 'free';
+            $record->timemodified = $now;
+            $DB->update_record('local_inventario_license', $record);
+        }
+        upgrade_plugin_savepoint(true, 2025122211, 'local', 'inventario');
     }
     return true;
 }

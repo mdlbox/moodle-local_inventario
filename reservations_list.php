@@ -415,6 +415,7 @@ echo html_writer::tag(
                 html_writer::tag('button', get_string('closebuttontitle'), [
                     'type' => 'button',
                     'class' => 'btn btn-secondary',
+                    'data-bs-dismiss' => 'modal',
                     'data-dismiss' => 'modal',
                 ]),
                 ['class' => 'modal-footer']

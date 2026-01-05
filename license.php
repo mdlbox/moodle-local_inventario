@@ -47,6 +47,12 @@ if ($refresh && confirm_sesskey()) {
 
 $form = new local_inventario_license_form($PAGE->url);
 $status = $license->get_status();
+$defaultkey = \local_inventario\local\license_manager::default_free_key();
+if (empty($status->apikey)) {
+    // Seed with bundled Free key on fresh installs.
+    $license->save_apikey($defaultkey);
+    $status = $license->get_status();
+}
 $form->set_data(['apikey' => $status->apikey]);
 
 if ($form->is_cancelled()) {
@@ -65,6 +71,11 @@ if ($data = $form->get_data()) {
     } else if ($status->status === 'pro') {
         $message = get_string('licensevalid', 'local_inventario');
         $type = 'success';
+    } else if (!empty($status->apikey) &&
+        $status->apikey === \local_inventario\local\license_manager::default_free_key()) {
+        // Special case: bundled Free key may appear expired in backend response.
+        $message = get_string('licensefreekey', 'local_inventario');
+        $type = 'warning';
     } else if (!empty($status->expiresat) && $status->expiresat < time()) {
         $message = get_string('licenseexpired', 'local_inventario', userdate($status->expiresat));
         $type = 'error';
@@ -107,6 +118,32 @@ echo html_writer::div(
         'local_inventario',
         html_writer::link('https://mdlbox.com', 'https://mdlbox.com', ['target' => '_blank', 'rel' => 'noopener'])
     )
+);
+
+echo html_writer::div(
+    html_writer::tag('h3', get_string('freelimits_title', 'local_inventario'), ['class' => 'h5 mb-2']) .
+    html_writer::tag('p', get_string('freelimits_body', 'local_inventario')) .
+    html_writer::tag(
+        'p',
+        get_string(
+            'freelimits_guide',
+            'local_inventario',
+            html_writer::link(
+                'https://mdlbox.com/knowledge_center/',
+                get_string('freelimits_guide_link', 'local_inventario'),
+                ['target' => '_blank', 'rel' => 'noopener']
+            )
+        )
+    ) .
+    html_writer::div(
+        html_writer::link(
+            'https://mdlbox.com',
+            get_string('freelimits_moreinfo', 'local_inventario'),
+            ['target' => '_blank', 'rel' => 'noopener']
+        ),
+        'mt-2'
+    ),
+    'card shadow-sm mt-3 p-3 mb-3'
 );
 echo $OUTPUT->single_button(
     new moodle_url($PAGE->url, ['refresh' => 1, 'sesskey' => sesskey()]),
