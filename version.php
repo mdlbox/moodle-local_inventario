@@ -18,15 +18,15 @@
  * Version information for the Inventario plugin.
  *
  * @package   local_inventario
- * @copyright 2025 mdlbox - https://app.mdlbox.com
+ * @copyright 2026 mdlbox - https://mdlbox.com
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_inventario';
-$plugin->version   = 2025122224;
+$plugin->version   = 2025122226;
 $plugin->requires  = 2022041200; // Moodle 4.0.
 $plugin->supported = [400, 510]; // 4.0, 5.1.
 $plugin->maturity  = MATURITY_STABLE;
-$plugin->release   = '1.0.24';
+$plugin->release   = '1.0.26';

@@ -18,7 +18,7 @@
  * License/API key management page.
  *
  * @package   local_inventario
- * @copyright 2025 mdlbox - https://app.mdlbox.com
+ * @copyright 2026 mdlbox - https://mdlbox.com
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 

@@ -18,7 +18,7 @@
  * Stringhe di lingua per il plugin local_inventario.
  *
  * @package   local_inventario
- * @copyright 2025 mdlbox - https://app.mdlbox.com
+ * @copyright 2026 mdlbox - https://mdlbox.com
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 o successiva
  */
 
@@ -194,15 +194,18 @@ $string['reservationdeleted'] = 'Prenotazione eliminata';
 $string['reservationexpired'] = 'Prenotazione scaduta';
 $string['reservationexpiredbody'] = 'La prenotazione per "{$a->object}" è scaduta il {$a->end}. Gestiscila qui: {$a->link}';
 $string['reservationexpiredsubject'] = 'Prenotazione scaduta: {$a}';
+$string['messageprovider:reservation_expired'] = 'Notifica: prenotazione scaduta';
 $string['reservationhelp'] = 'I docenti gestiscono solo le proprie prenotazioni; il manager gestisce tutto.';
 $string['reservationoverdue'] = 'Prenotazione in ritardo';
 $string['reservationoverduebody'] = 'La prenotazione per "{$a->object}" è in ritardo dal {$a->end}. Restituisci l\'oggetto o aggiorna la prenotazione: {$a->link}';
 $string['reservationoverduesubject'] = 'Prenotazione in ritardo: {$a}';
+$string['messageprovider:reservation_overdue'] = 'Notifica: prenotazione in ritardo';
 $string['reservationreturned'] = 'Prenotazione restituita';
 $string['reservationexpiredshort'] = 'Scaduto';
 $string['reservation_expired'] = 'Prenotazione scaduta';
 $string['reservation_overdue'] = 'Prenotazione in ritardo';
 $string['allreservations'] = 'Tutte le prenotazioni';
+$string['yourreservations'] = 'Le tue prenotazioni';
 $string['reservations'] = 'Prenotazioni';
 $string['reservationsactive'] = 'Prenotazioni attive';
 $string['reservationscalendar'] = 'Calendario prenotazioni';

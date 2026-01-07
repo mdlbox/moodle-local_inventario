@@ -18,7 +18,7 @@
  * Language strings for local_inventario.
  *
  * @package   local_inventario
- * @copyright 2025 mdlbox - https://app.mdlbox.com
+ * @copyright 2026 mdlbox - https://mdlbox.com
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
@@ -194,15 +194,18 @@ $string['reservationdeleted'] = 'Reservation deleted';
 $string['reservationexpired'] = 'Reservation expired';
 $string['reservationexpiredbody'] = 'Your reservation for "{$a->object}" expired on {$a->end}. Please manage it here: {$a->link}';
 $string['reservationexpiredsubject'] = 'Reservation expired: {$a}';
+$string['messageprovider:reservation_expired'] = 'Notification: reservation expired';
 $string['reservationhelp'] = 'Teachers can manage only their own reservations; managers can manage all.';
 $string['reservationoverdue'] = 'Reservation overdue';
 $string['reservationoverduebody'] = 'Your reservation for "{$a->object}" is overdue since {$a->end}. Please return the object or update the reservation: {$a->link}';
 $string['reservationoverduesubject'] = 'Reservation overdue: {$a}';
+$string['messageprovider:reservation_overdue'] = 'Notification: reservation overdue';
 $string['reservationreturned'] = 'Reservation returned';
 $string['reservationexpiredshort'] = 'Expired';
 $string['reservation_expired'] = 'Reservation expired';
 $string['reservation_overdue'] = 'Reservation overdue';
 $string['allreservations'] = 'All reservations';
+$string['yourreservations'] = 'Your reservations';
 $string['reservations'] = 'Reservations';
 $string['reservationsactive'] = 'Active reservations';
 $string['reservationscalendar'] = 'Reservations calendar';
