@@ -71,8 +71,10 @@ if ($data = $form->get_data()) {
     } else if ($status->status === 'pro') {
         $message = get_string('licensevalid', 'local_inventario');
         $type = 'success';
-    } else if (!empty($status->apikey) &&
-        $status->apikey === \local_inventario\local\license_manager::default_free_key()) {
+    } else if (
+        !empty($status->apikey)
+        && $status->apikey === \local_inventario\local\license_manager::default_free_key()
+    ) {
         // Special case: bundled Free key may appear expired in backend response.
         $message = get_string('licensefreekey', 'local_inventario');
         $type = 'warning';

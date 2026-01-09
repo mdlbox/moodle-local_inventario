@@ -164,9 +164,7 @@ function xmldb_local_inventario_upgrade(int $oldversion): bool {
             $typestable->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
             $dbman->create_table($typestable);
         }
-        if ($driver === 'mysql') {
-            // No driver-specific SQL required; XMLDB handles sequences/identity.
-        }
+        // No driver-specific SQL required for MySQL; XMLDB handles sequences/identity.
 
         // Typeprops.
         $typepropstable = new xmldb_table('local_inventario_typeprops');
@@ -183,9 +181,7 @@ function xmldb_local_inventario_upgrade(int $oldversion): bool {
             $typepropstable->add_key('typepropuniq', XMLDB_KEY_UNIQUE, ['typeid', 'propertyid']);
             $dbman->create_table($typepropstable);
         }
-        if ($driver === 'mysql') {
-            // No driver-specific SQL required; XMLDB handles sequences/identity.
-        }
+        // No driver-specific SQL required for MySQL; XMLDB handles sequences/identity.
 
         upgrade_plugin_savepoint(true, 2025112314, 'local', 'inventario');
     }

@@ -347,7 +347,7 @@ foreach ($reservations as $reservation) {
         );
         $detailparts[] = html_writer::div(
             html_writer::tag('strong', get_string('period', 'local_inventario') . ': ') .
-            userdate($reservation->timestart) . ' → ' . userdate($reservation->timeend)
+            userdate($reservation->timestart) . ' â†’ ' . userdate($reservation->timeend)
         );
         if (!empty($reservation->location)) {
             $detailparts[] = html_writer::div(
@@ -384,7 +384,7 @@ foreach ($reservations as $reservation) {
         format_string($typebyid[$reservation->typeid] ?? ''),
         fullname($reservation),
         format_string($reservation->sitename),
-        userdate($reservation->timestart) . ' → ' . userdate($reservation->timeend),
+        userdate($reservation->timestart) . ' â†’ ' . userdate($reservation->timeend),
         format_string($reservation->location),
         $actions,
     ];

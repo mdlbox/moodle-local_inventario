@@ -106,4 +106,3 @@ class local_inventario_property_form extends moodleform {
         $this->add_action_buttons();
     }
 }
-

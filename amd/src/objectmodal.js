@@ -5,7 +5,7 @@
  * @copyright  2025 mdlbox - https://app.mdlbox.com
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-define(['jquery', 'core/modal_factory', 'core/modal_events'], function($, ModalFactory, ModalEvents) {
+define(['jquery', 'core/modal_factory', 'core/modal_events', 'core/notification'], function($, ModalFactory, ModalEvents, Notification) {
     /**
      * Init modal binding using Moodle ModalFactory.
      */
@@ -33,6 +33,7 @@ define(['jquery', 'core/modal_factory', 'core/modal_events'], function($, ModalF
                     modal.setBody('');
                 });
                 modal.show();
+                return modal;
             }).catch(Notification.exception);
         });
     };

@@ -16,6 +16,54 @@
 
     Dashboard template for local_inventario.
     @template local_inventario/dashboard
+    Example context (json):
+    {
+        "license": {
+            "status": "free",
+            "domain": "example.org",
+            "expires": "2030-01-01",
+            "allowhidden": false
+        },
+        "stats": {
+            "objects": 12,
+            "reservations": 3,
+            "userreservations": 1
+        },
+        "objectfilters": {
+            "search": "",
+            "selectedtype": 0,
+            "selectedstatus": "available",
+            "selectedsite": 0,
+            "perpage": 10,
+            "types": [{"id": 1, "name": "Camera", "selected": true}],
+            "statuses": [{"value": "available", "label": "Available", "selected": true}],
+            "sites": [{"id": 1, "name": "HQ", "selected": true}],
+            "perpageoptions": [{"value": 10, "label": "10", "selected": true}]
+        },
+        "reservationfilters": {
+            "perpageoptions": [{"value": 10, "label": "10", "selected": true}]
+        },
+        "links": {
+            "objects": "https://example.org/local/inventario/index.php"
+        },
+        "objects": [{
+            "id": 1,
+            "name_badge": "<span>Camera</span>",
+            "site": "HQ",
+            "status": "<span>Available</span>",
+            "visible": true,
+            "detail_title": "Camera",
+            "detail_html": "<p>Details</p>",
+            "reserve_url": "https://example.org/local/inventario/reservations.php"
+        }],
+        "reservations": [{
+            "object": "Camera",
+            "user": "Admin User",
+            "site": "HQ",
+            "period": "01/01/2030",
+            "location": "Lab"
+        }]
+    }
     @copyright 2026 mdlbox - https://mdlbox.com
     @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
 }}
@@ -76,7 +124,7 @@
     </div>
 
     <h3>{{#str}}objectslist, local_inventario{{/str}}</h3>
-    <form method="get" action="" class="row g-2 align-items-end mb-3">
+    <form method="get" class="row g-2 align-items-end mb-3">
         <div class="col-md-3">
             <label class="form-label" for="search">{{#str}}search{{/str}}</label>
             <input type="text" class="form-control" name="search" id="search" value="{{objectfilters.search}}">
@@ -174,7 +222,7 @@
     </div>
 
     <h3>{{#str}}reservations, local_inventario{{/str}}</h3>
-    <form method="get" action="" class="d-flex justify-content-end align-items-center gap-2 mb-2 flex-wrap">
+    <form method="get" class="d-flex justify-content-end align-items-center gap-2 mb-2 flex-wrap">
         <input type="hidden" name="search" value="{{objectfilters.search}}">
         <input type="hidden" name="typeid" value="{{objectfilters.selectedtype}}">
         <input type="hidden" name="status" value="{{objectfilters.selectedstatus}}">

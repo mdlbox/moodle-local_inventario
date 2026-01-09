@@ -206,8 +206,10 @@ foreach ($objects as $object) {
                 $availabilitylines[] = get_string('availability_times', 'local_inventario') . ': ' . implode(', ', $slots);
             }
         }
-        $availabilitylines[] = get_string('status', 'local_inventario') . ': ' .
-            ($currentlyavailable ? get_string('status_available', 'local_inventario') : get_string('status_unavailable', 'local_inventario'));
+        $availabilitystatus = $currentlyavailable
+            ? get_string('status_available', 'local_inventario')
+            : get_string('status_unavailable', 'local_inventario');
+        $availabilitylines[] = get_string('status', 'local_inventario') . ': ' . $availabilitystatus;
         $detailparts[] = html_writer::div(
             html_writer::tag('strong', get_string('availability', 'local_inventario')) . ' ' .
             html_writer::alist($availabilitylines),

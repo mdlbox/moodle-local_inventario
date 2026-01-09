@@ -26,5 +26,7 @@ define('AJAX_SCRIPT', true);
 
 require_once(__DIR__ . '/../../config.php');
 
+require_login();
+
 // Deprecated: use external services (webservice AJAX) defined in db/services.php.
 throw new moodle_exception('deprecatedajax', 'local_inventario');

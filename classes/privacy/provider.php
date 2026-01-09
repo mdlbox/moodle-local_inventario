@@ -37,7 +37,7 @@ use core_privacy\local\request\writer;
 /**
  * Privacy provider for local_inventario.
  */
-class provider implements plugin_provider, \core_privacy\local\metadata\provider, \core_privacy\local\request\userlist_provider {
+class provider implements \core_privacy\local\metadata\provider, \core_privacy\local\request\userlist_provider, plugin_provider {
     /**
      * Describe stored data.
      *

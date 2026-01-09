@@ -1198,6 +1198,10 @@ class inventory_service {
             ? get_string('nopropertiesassigned', 'local_inventario')
             : '- ' . implode("\n- ", $propertylines);
 
+        $reservationurl = (new \moodle_url(
+            '/local/inventario/reservations.php',
+            ['focus' => $reservation->id]
+        ))->out(false);
         $tokens = [
             '{object}' => format_string($object->name),
             '{type}' => $type ? format_string($type->name) : '',
@@ -1206,7 +1210,7 @@ class inventory_service {
             '{start}' => userdate($reservation->timestart),
             '{end}' => userdate($reservation->timeend),
             '{properties}' => $propertiestext,
-            '{reservationurl}' => (new \moodle_url('/local/inventario/reservations.php', ['focus' => $reservation->id]))->out(false),
+            '{reservationurl}' => $reservationurl,
             '{userfullname}' => fullname($user),
         ];
 

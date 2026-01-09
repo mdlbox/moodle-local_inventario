@@ -54,7 +54,15 @@ class local_inventario_object_form extends moodleform {
      * @param string $baseurl
      * @param bool $ispro
      */
-    public function __construct($action, array $sites, array $types, bool $allowhidden, array $properties, string $baseurl, bool $ispro) {
+    public function __construct(
+        $action,
+        array $sites,
+        array $types,
+        bool $allowhidden,
+        array $properties,
+        string $baseurl,
+        bool $ispro
+    ) {
         $this->sites = $sites;
         $this->types = $types;
         $this->allowhidden = $allowhidden;
@@ -247,5 +255,3 @@ class local_inventario_object_form extends moodleform {
         return $slots;
     }
 }
-
-

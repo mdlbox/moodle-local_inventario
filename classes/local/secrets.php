@@ -26,8 +26,6 @@
 
 namespace local_inventario\local;
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * Simple secret helper that keeps endpoint and token encrypted in code.
  */

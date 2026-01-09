@@ -235,6 +235,9 @@ class license_manager {
 
     /**
      * Force a refresh of license data contacting the external API.
+     *
+     * @param bool $force
+     * @return stdClass
      */
     public function refresh(bool $force = false): stdClass {
         global $CFG;
@@ -262,7 +265,12 @@ class license_manager {
             $checkinterval = 1800;
         }
 
-        if (!$force && ($now - (int)$record->lastcheck) < $checkinterval && $this->validate_signature($record) && $this->has_valid_pro_token($record)) {
+        if (
+            !$force
+            && ($now - (int)$record->lastcheck) < $checkinterval
+            && $this->validate_signature($record)
+            && $this->has_valid_pro_token($record)
+        ) {
             return $record;
         }
 
@@ -404,6 +412,9 @@ class license_manager {
 
     /**
      * Persist a new license key manually set.
+     *
+     * @param string $apikey
+     * @return stdClass
      */
     public function save_apikey(string $apikey): stdClass {
         $record = $this->get_status();
@@ -479,6 +490,9 @@ class license_manager {
 
     /**
      * Persist license record.
+     *
+     * @param stdClass $record
+     * @return stdClass
      */
     private function persist_license(stdClass $record): stdClass {
         global $DB;
@@ -492,6 +506,9 @@ class license_manager {
 
     /**
      * Compute canonical signature for a payload.
+     *
+     * @param array $payload
+     * @return string
      */
     private function sign(array $payload): string {
         $secret = trim(secrets::apitoken());
@@ -505,6 +522,9 @@ class license_manager {
 
     /**
      * Canonicalise array recursively.
+     *
+     * @param array $data
+     * @return array
      */
     private function canonicalize(array $data): array {
         ksort($data);
@@ -518,6 +538,9 @@ class license_manager {
 
     /**
      * Validate stored signature against saved payload data.
+     *
+     * @param stdClass $record
+     * @return bool
      */
     private function validate_signature(stdClass $record): bool {
         if (empty($record->signature)) {
@@ -535,6 +558,9 @@ class license_manager {
 
     /**
      * Transform DB record to the payload signed by the backend.
+     *
+     * @param stdClass $record
+     * @return array
      */
     private function signature_payload_from_record(stdClass $record): array {
         $limits = $this->decode_limits($record->limitsjson ?? '');
@@ -554,6 +580,10 @@ class license_manager {
 
     /**
      * Validate remote response signature.
+     *
+     * @param array $response
+     * @param string $secret
+     * @return bool
      */
     private function is_signed_response_valid(array $response, string $secret): bool {
         if (empty($response['signature'])) {
@@ -585,6 +615,12 @@ class license_manager {
 
     /**
      * Update local record with a validated backend response.
+     *
+     * @param stdClass $record
+     * @param array $response
+     * @param string $domain
+     * @param int $now
+     * @return stdClass
      */
     private function update_record_from_response(stdClass $record, array $response, string $domain, int $now): stdClass {
         $record->status = ($response['mode'] ?? 'free') === 'pro' ? 'pro' : 'free';
@@ -631,6 +667,9 @@ class license_manager {
 
     /**
      * Sanitize limit values.
+     *
+     * @param array $limits
+     * @return array
      */
     private function sanitize_limits(array $limits): array {
         return [
@@ -695,6 +734,9 @@ class license_manager {
 
     /**
      * Verify current Pro token freshness.
+     *
+     * @param stdClass $record
+     * @return bool
      */
     private function has_valid_pro_token(stdClass $record): bool {
         if ($record->status !== 'pro') {

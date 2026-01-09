@@ -25,6 +25,7 @@
 require_once(__DIR__ . '/../../config.php');
 require_once(__DIR__ . '/locallib.php');
 
+require_login(null, true);
 $context = context_system::instance();
 $PAGE->set_url(new moodle_url('/local/inventario/public.php'));
 $PAGE->set_context($context);
@@ -88,13 +89,8 @@ foreach ($reservations as $reservation) {
 echo $OUTPUT->header();
 echo html_writer::div(get_string('publichint', 'local_inventario'), 'alert alert-info mb-4');
 
-/**
- * Render a simple table with badge status.
- *
- * @param string $title
- * @param array $rows
- */
-$rendertable = function(string $title, array $rows): void {
+// Render a simple table with badge status.
+$rendertable = function (string $title, array $rows): void {
     echo html_writer::tag('h3', $title, ['class' => 'h4 mb-3 mt-4']);
     if (empty($rows)) {
         echo html_writer::div(get_string('nostats', 'local_inventario'), 'alert alert-secondary');

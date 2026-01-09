@@ -23,9 +23,8 @@
  */
 
 define('CLI_SCRIPT', true);
-define('MOODLE_INTERNAL', true);
 
-require_once(__DIR__ . '/../classes/local/secrets.php');
+require_once(__DIR__ . '/../../../config.php');
 
 use local_inventario\local\secrets;
 

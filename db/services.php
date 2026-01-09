@@ -31,7 +31,7 @@ $functions = [
         'classpath'   => 'local/inventario/externallib.php',
         'description' => 'Toggle object visibility',
         'type'        => 'write',
-        'capabilities'=> 'local/inventario:togglevisibility',
+        'capabilities' => 'local/inventario:togglevisibility',
         'ajax'        => true,
     ],
     'local_inventario_refresh_license' => [
@@ -40,7 +40,7 @@ $functions = [
         'classpath'   => 'local/inventario/externallib.php',
         'description' => 'Force refresh of license data',
         'type'        => 'write',
-        'capabilities'=> 'local/inventario:managelicense',
+        'capabilities' => 'local/inventario:managelicense',
         'ajax'        => true,
     ],
 ];

@@ -69,7 +69,16 @@ if ($hassiteconfig) {
         'local_inventario/confirmation_body_template',
         get_string('reservationconfirmation_body', 'local_inventario'),
         get_string('reservationconfirmation_tokens', 'local_inventario'),
-        "Ciao {userfullname},\n\nLa tua prenotazione è stata registrata.\n\n- Oggetto: {object}\n- Tipo: {type}\n- Sede: {site}\n- Luogo di utilizzo: {location}\n- Periodo: {start} - {end}\n\nDettagli oggetto:\n{properties}\n\nGestisci prenotazione: {reservationurl}",
+        "Ciao {userfullname},\n\n" .
+            "La tua prenotazione è stata registrata.\n\n" .
+            "- Oggetto: {object}\n" .
+            "- Tipo: {type}\n" .
+            "- Sede: {site}\n" .
+            "- Luogo di utilizzo: {location}\n" .
+            "- Periodo: {start} - {end}\n\n" .
+            "Dettagli oggetto:\n" .
+            "{properties}\n\n" .
+            "Gestisci prenotazione: {reservationurl}",
         PARAM_RAW,
         60,
         8
@@ -90,7 +99,8 @@ if ($hassiteconfig) {
         'local_inventario/overdue_body_template',
         get_string('overdue_body_template', 'local_inventario'),
         get_string('notificationtokenshint', 'local_inventario'),
-        'Your reservation for "{object}" is overdue since {end}. Please return the object or update the reservation: {reservationurl}',
+        'Your reservation for "{object}" is overdue since {end}. ' .
+            'Please return the object or update the reservation: {reservationurl}',
         PARAM_RAW,
         60,
         4

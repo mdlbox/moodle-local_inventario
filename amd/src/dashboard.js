@@ -21,8 +21,7 @@
  * @copyright 2026 mdlbox - https://mdlbox.com
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-define(['core/ajax', 'core/notification', 'core/toast', 'core/str'], function(Ajax, Notification, Toast, str) {
-    let unknownError = '';
+define(['core/ajax', 'core/notification', 'core/toast'], function(Ajax, Notification, Toast) {
 
     /**
      * Execute AJAX toggle request.
@@ -44,6 +43,7 @@ define(['core/ajax', 'core/notification', 'core/toast', 'core/str'], function(Aj
                 trigger.dataset.visible = visible.toString();
                 trigger.innerText = visible ? trigger.dataset.hideLabel : trigger.dataset.showLabel;
                 Toast.add({message: trigger.dataset.notice});
+                return true;
             })
             .catch(Notification.exception);
     };
@@ -66,17 +66,12 @@ define(['core/ajax', 'core/notification', 'core/toast', 'core/str'], function(Aj
      * Init module.
      */
     const init = () => {
-        str.get_string('unknownerror', 'local_inventario')
-            .then(message => {
-                unknownError = message;
-                document.querySelectorAll('[data-inventario-toggle]').forEach(trigger => {
-                    trigger.addEventListener('click', e => {
-                        e.preventDefault();
-                        handleToggle(trigger);
-                    });
-                });
-            })
-            .catch(Notification.exception);
+        document.querySelectorAll('[data-inventario-toggle]').forEach(trigger => {
+            trigger.addEventListener('click', e => {
+                e.preventDefault();
+                handleToggle(trigger);
+            });
+        });
     };
 
     return {init};
