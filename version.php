@@ -25,8 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_inventario';
-$plugin->version   = 2025122226;
+$plugin->version   = 2025122227;
 $plugin->requires  = 2022041200; // Moodle 4.0.
 $plugin->supported = [400, 510]; // 4.0, 5.1.
 $plugin->maturity  = MATURITY_STABLE;
-$plugin->release   = '1.0.26';
+$plugin->release   = '1.0.27';
