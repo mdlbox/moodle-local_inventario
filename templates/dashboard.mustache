@@ -18,12 +18,6 @@
     @template local_inventario/dashboard
     Example context (json):
     {
-        "license": {
-            "status": "free",
-            "domain": "example.org",
-            "expires": "2030-01-01",
-            "allowhidden": false
-        },
         "stats": {
             "objects": 12,
             "reservations": 3,
@@ -68,34 +62,6 @@
     @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
 }}
 <div class="inventario-dashboard">
-    <div class="d-flex justify-content-end">
-        <details class="mb-3 inventario-license-details">
-            <summary class="btn btn-secondary d-inline-block">{{#str}}licenseinfo, local_inventario{{/str}}</summary>
-            <div class="card shadow-sm mt-2 inventario-license-card">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="text-muted small">{{#str}}license, local_inventario{{/str}}</span>
-                        <span class="badge bg-secondary text-uppercase">{{license.status}}</span>
-                    </div>
-                    <div class="fw-bold">{{#str}}licensedomain, local_inventario, {{license.domain}}{{/str}}</div>
-                    {{#license.expires}}
-                        <div class="text-muted small">{{#str}}licenseexpires, local_inventario, {{license.expires}}{{/str}}</div>
-                    {{/license.expires}}
-                    {{^license.expires}}
-                        <div class="text-muted small">{{#str}}licensevalid, local_inventario{{/str}}</div>
-                    {{/license.expires}}
-                    {{^license.allowhidden}}
-                        <div class="mt-2 alert alert-warning p-2 mb-0">
-                            {{#str}}licenseinvalid, local_inventario{{/str}}
-                            <div class="small text-muted mb-1">{{#str}}licensefreeinfo, local_inventario{{/str}}</div>
-                            <div class="small text-muted">{{#str}}licensedomain, local_inventario, {{license.domain}}{{/str}}</div>
-                        </div>
-                    {{/license.allowhidden}}
-                </div>
-            </div>
-        </details>
-    </div>
-
     <div class="row g-3 mb-4">
         <div class="col-md-4">
             <div class="card shadow-sm border-0 h-100 bg-light">
@@ -124,7 +90,11 @@
     </div>
 
     <h3>{{#str}}objectslist, local_inventario{{/str}}</h3>
-    <form method="get" class="row g-2 align-items-end mb-3">
+    <div class="card mb-3 shadow-sm inventario-filter-card">
+        <button type="button" class="inventario-filter-toggle collapsed" data-toggle="collapse" data-bs-toggle="collapse" data-target="#inventario-filter-collapse-dash" data-bs-target="#inventario-filter-collapse-dash" aria-expanded="false" aria-controls="inventario-filter-collapse-dash"><span class="fa fa-filter me-2" aria-hidden="true"></span>{{#str}}filters, local_inventario{{/str}}<span class="fa fa-chevron-down ms-auto inventario-filter-chevron" aria-hidden="true"></span></button>
+        <div id="inventario-filter-collapse-dash" class="collapse">
+            <div class="card-body">
+    <form method="get" class="row g-2 align-items-end mb-0 inventario-filters">
         <div class="col-md-3">
             <label class="form-label" for="search">{{#str}}search{{/str}}</label>
             <input type="text" class="form-control" name="search" id="search" value="{{objectfilters.search}}">
@@ -168,6 +138,9 @@
             </div>
         </div>
     </form>
+            </div>
+        </div>
+    </div>
     <div class="table-responsive">
         <table class="generaltable inventario-table">
             <thead>

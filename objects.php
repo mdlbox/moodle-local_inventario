@@ -41,7 +41,6 @@ $PAGE->set_url('/local/inventario/objects.php');
 $PAGE->set_context($context);
 $PAGE->set_title(get_string('manageobjects', 'local_inventario'));
 $PAGE->set_heading(get_string('manageobjects', 'local_inventario'));
-$PAGE->requires->css('/local/inventario/styles.css');
 
 $licensemanager = local_inventario_license();
 $licensestatus = $licensemanager->refresh();
@@ -84,6 +83,17 @@ if ($toggleid && confirm_sesskey()) {
     redirect($PAGE->url, get_string('visibletoggled', 'local_inventario'));
 }
 
+$bulkaction = optional_param('bulkaction', '', PARAM_ALPHA);
+$bulkids = optional_param_array('bulkobjectids', [], PARAM_INT);
+if ($bulkaction !== '' && confirm_sesskey()) {
+    if (empty($bulkids)) {
+        redirect($PAGE->url, get_string('bulknoselection', 'local_inventario'), null,
+            \core\output\notification::NOTIFY_WARNING);
+    }
+    $affected = $service->bulk_action($bulkids, $bulkaction);
+    redirect($PAGE->url, get_string('bulkdone', 'local_inventario', $affected));
+}
+
 $typeid = ($typeidparam > 0) ? $typeidparam : 0;
 $record = null;
 if ($id) {
@@ -114,6 +124,16 @@ if ($form->is_cancelled()) {
 
 if ($data = $form->get_data()) {
     $objectid = $service->save_object($data, $USER->id);
+    if (isset($data->objectfiles)) {
+        file_save_draft_area_files(
+            $data->objectfiles,
+            $context->id,
+            'local_inventario',
+            'objectfiles',
+            $objectid,
+            local_inventario_object_file_options()
+        );
+    }
     $values = [];
     $propsfortype = $typeservice->get_type_properties((int)$data->typeid);
     foreach ($propsfortype as $property) {
@@ -138,8 +158,15 @@ if ($record) {
     $record->availablefrom = $record->availablefrom ?? 0;
     $record->availableto = $record->availableto ?? 0;
     $record->availabletimes = $record->availabletimes ?? '';
+    $draftitemid = file_get_submitted_draft_itemid('objectfiles');
+    file_prepare_draft_area($draftitemid, $context->id, 'local_inventario', 'objectfiles', $id,
+        local_inventario_object_file_options());
+    $record->objectfiles = $draftitemid;
     $form->set_data($record);
 } else {
+    $draftitemid = file_get_submitted_draft_itemid('objectfiles');
+    file_prepare_draft_area($draftitemid, $context->id, 'local_inventario', 'objectfiles', null,
+        local_inventario_object_file_options());
     $form->set_data([
         'siteid' => $siteoptions ? array_key_first($siteoptions) : 0,
         'typeid' => $typeid,
@@ -147,6 +174,7 @@ if ($record) {
         'availablefrom' => 0,
         'availableto' => 0,
         'availabletimes' => '',
+        'objectfiles' => $draftitemid,
     ]);
 }
 
@@ -157,11 +185,15 @@ echo local_inventario_render_nav($context);
 
 $form->display();
 
+$fs = get_file_storage();
+
 $table = new html_table();
 $table->head = [
+    html_writer::empty_tag('input', ['type' => 'checkbox', 'id' => 'inventario-selectall', 'title' => get_string('selectall')]),
     get_string('object', 'local_inventario'),
     get_string('type', 'local_inventario'),
     get_string('site', 'local_inventario'),
+    get_string('condition', 'local_inventario'),
     get_string('status', 'local_inventario'),
     get_string('visibility', 'local_inventario'),
 ];
@@ -190,15 +222,57 @@ foreach ($objects as $object) {
         $statuslabel = get_string('status_unavailable', 'local_inventario');
         $statusclass = 'badge bg-secondary text-white';
     } else {
-        $statuskey = $hasactive ? $object->status : 'available';
+        $objectstatus = clean_param((string)$object->status, PARAM_ALPHA);
+        if (!in_array($objectstatus, ['available', 'reserved', 'offsite'], true)) {
+            $objectstatus = 'available';
+        }
+        $statuskey = $hasactive ? $objectstatus : 'available';
         $statuslabel = get_string('status_' . $statuskey, 'local_inventario');
         $statusclass = $statuskey === 'available' ? 'badge bg-success text-white' : 'badge bg-danger text-white';
     }
+    $statushtml = html_writer::span($statuslabel, $statusclass);
+    if (!empty($object->inmaintenance)) {
+        $statushtml .= ' ' . html_writer::span(
+            get_string('inmaintenance', 'local_inventario'),
+            'badge bg-warning text-dark'
+        );
+    }
+
+    $thumb = '';
+    $objectimages = $fs->get_area_files($context->id, 'local_inventario', 'objectfiles', $object->id, 'filename', false);
+    foreach ($objectimages as $imagefile) {
+        if ($imagefile->is_valid_image()) {
+            $imgurl = moodle_url::make_pluginfile_url(
+                $context->id,
+                'local_inventario',
+                'objectfiles',
+                $object->id,
+                $imagefile->get_filepath(),
+                $imagefile->get_filename()
+            );
+            $thumb = html_writer::img($imgurl, format_string($object->name), ['class' => 'inventario-obj-thumb']) . ' ';
+            break;
+        }
+    }
+
+    $cond = in_array($object->itemcondition ?? 'good', ['new', 'good', 'fair', 'poor'], true)
+        ? $object->itemcondition
+        : 'good';
+
+    $checkbox = html_writer::empty_tag('input', [
+        'type' => 'checkbox',
+        'name' => 'bulkobjectids[]',
+        'value' => $object->id,
+        'class' => 'inventario-bulkcb',
+    ]);
+
     $row = [
-        format_string($object->name),
+        $checkbox,
+        $thumb . format_string($object->name),
         format_string($typeoptions[$object->typeid] ?? ''),
         format_string($siteoptions[$object->siteid] ?? ''),
-        html_writer::span($statuslabel, $statusclass),
+        get_string('condition_' . $cond, 'local_inventario'),
+        $statushtml,
         $object->visible ? get_string('visible', 'local_inventario') : get_string('hidden', 'local_inventario'),
     ];
     if ($licensestatus->status === 'pro') {
@@ -213,16 +287,39 @@ foreach ($objects as $object) {
 
     $actions = [];
     $actions[] = html_writer::link(new moodle_url($PAGE->url, ['id' => $object->id]), $editicon);
-    if ($allowhidden) {
-        $actions[] = html_writer::link($toggleurl, $object->visible ? $toggleicon : $showicon);
-    } else {
-        $actions[] = get_string('proonly', 'local_inventario');
-    }
+    $actions[] = html_writer::link($toggleurl, $object->visible ? $toggleicon : $showicon);
     $actions[] = html_writer::link($deleteurl, $deleteicon);
     $row[] = implode(' ', $actions);
     $table->data[] = $row;
 }
 
+$bulkoptions = ['' => get_string('bulkchoose', 'local_inventario')];
+if ($allowhidden) {
+    $bulkoptions['show'] = get_string('show', 'local_inventario');
+    $bulkoptions['hide'] = get_string('hide', 'local_inventario');
+}
+$bulkoptions['maintenance_on'] = get_string('bulkmaintenanceon', 'local_inventario');
+$bulkoptions['maintenance_off'] = get_string('bulkmaintenanceoff', 'local_inventario');
+$bulkoptions['delete'] = get_string('delete');
+$bulkbar = html_writer::start_div('inventario-bulkbar d-flex align-items-center gap-2 mb-2');
+$bulkbar .= html_writer::label(get_string('bulkactions', 'local_inventario'), 'bulkaction', false, ['class' => 'mb-0 me-1']);
+$bulkbar .= html_writer::select($bulkoptions, 'bulkaction', '', false, ['class' => 'custom-select w-auto']);
+$bulkbar .= html_writer::tag('button', get_string('apply', 'local_inventario'), ['type' => 'submit', 'class' => 'btn btn-secondary']);
+$bulkbar .= html_writer::end_div();
+
+echo html_writer::start_tag('form', [
+    'method' => 'post',
+    'action' => $PAGE->url->out(false),
+    'id' => 'inventario-bulk-form',
+]);
+echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
+echo $bulkbar;
 echo html_writer::table($table);
+echo html_writer::end_tag('form');
+
+$PAGE->requires->js_call_amd('local_inventario/objectsbulk', 'init', [[
+    'noselection' => get_string('bulknoselection', 'local_inventario'),
+    'deleteconfirm' => get_string('bulkdeleteconfirm', 'local_inventario'),
+]]);
 
 echo $OUTPUT->footer();

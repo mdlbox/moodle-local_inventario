@@ -31,4 +31,7 @@ $messageproviders = [
     'reservation_overdue' => [
         'capability' => 'local/inventario:reserve',
     ],
+    'absence_notification' => [
+        'capability' => 'local/inventario:addabsence',
+    ],
 ];

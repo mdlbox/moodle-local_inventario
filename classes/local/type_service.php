@@ -134,6 +134,20 @@ class type_service {
     }
 
     /**
+     * Normalise CSV header names by trimming whitespace and removing UTF-8 BOM.
+     *
+     * @param array $columns
+     * @return array
+     */
+    private function normalise_csv_columns(array $columns): array {
+        return array_map(static function($column): string {
+            $value = (string)$column;
+            $value = preg_replace('/^\xEF\xBB\xBF/u', '', $value) ?? $value;
+            return trim($value);
+        }, $columns);
+    }
+
+    /**
      * Import types from CSV (Pro only).
      *
      * @param string $filepath
@@ -151,7 +165,7 @@ class type_service {
         $content = file_get_contents($filepath);
         $delimiter = $this->detect_csv_delimiter($content);
         $cir->load_csv_content($content, 'utf-8', $delimiter);
-        $columns = array_map('trim', $cir->get_columns() ?? []);
+        $columns = $this->normalise_csv_columns($cir->get_columns() ?? []);
         $required = ['name'];
         foreach ($required as $req) {
             if (!in_array($req, $columns, true)) {

@@ -26,22 +26,29 @@ defined('MOODLE_INTERNAL') || die();
 
 $functions = [
     'local_inventario_toggle_visibility' => [
-        'classname'   => 'local_inventario_external',
-        'methodname'  => 'toggle_visibility',
-        'classpath'   => 'local/inventario/externallib.php',
-        'description' => 'Toggle object visibility',
-        'type'        => 'write',
+        'classname'    => 'local_inventario\external\toggle_visibility',
+        'methodname'   => 'execute',
+        'description'  => 'Toggle object visibility',
+        'type'         => 'write',
         'capabilities' => 'local/inventario:togglevisibility',
-        'ajax'        => true,
+        'ajax'         => true,
     ],
-    'local_inventario_refresh_license' => [
-        'classname'   => 'local_inventario_external',
-        'methodname'  => 'refresh_license',
-        'classpath'   => 'local/inventario/externallib.php',
-        'description' => 'Force refresh of license data',
-        'type'        => 'write',
-        'capabilities' => 'local/inventario:managelicense',
-        'ajax'        => true,
+    'local_inventario_create_reservations' => [
+        'classname'    => 'local_inventario\external\create_reservations',
+        'methodname'   => 'execute',
+        'description'  => 'Create one reservation per selected object over a time range',
+        'type'         => 'write',
+        'capabilities' => 'local/inventario:reserve',
+        'ajax'         => true,
+    ],
+    'local_inventario_mobile_inventario_view' => [
+        'classname'    => 'local_inventario\external\mobile_inventario_view',
+        'methodname'   => 'execute',
+        'description'  => 'Returns the Inventario main view for the Moodle Mobile app',
+        'type'         => 'read',
+        'capabilities' => 'local/inventario:view',
+        'ajax'         => true,
+        'services'     => [MOODLE_OFFICIAL_MOBILE_SERVICE],
     ],
 ];
 

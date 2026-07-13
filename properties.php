@@ -39,7 +39,6 @@ $PAGE->set_url('/local/inventario/properties.php', ['id' => $id]);
 $PAGE->set_context($context);
 $PAGE->set_title(get_string('manageproperties', 'local_inventario'));
 $PAGE->set_heading(get_string('manageproperties', 'local_inventario'));
-$PAGE->requires->css('/local/inventario/styles.css');
 
 $form = new local_inventario_property_form($PAGE->url);
 $service = local_inventario_service();

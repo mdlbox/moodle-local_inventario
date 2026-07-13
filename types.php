@@ -38,7 +38,6 @@ $PAGE->set_url('/local/inventario/types.php', ['id' => $id]);
 $PAGE->set_context($context);
 $PAGE->set_title(get_string('managetypes', 'local_inventario'));
 $PAGE->set_heading(get_string('managetypes', 'local_inventario'));
-$PAGE->requires->css('/local/inventario/styles.css');
 
 $typeservice = local_inventario_typeservice();
 $service = local_inventario_service();
@@ -112,7 +111,7 @@ foreach ($objectslist as $obj) {
         } else {
             $valdisplay = $val;
         }
-        $propvalues[] = $label . ': ' . s($valdisplay);
+        $propvalues[] = s($label) . ': ' . s($valdisplay);
     }
     $objectsbytype[$obj->typeid][] = [
         'id' => (int)$obj->id,
@@ -187,7 +186,7 @@ foreach ($types as $type) {
         foreach ($objectlist as $obj) {
             $propshtml = empty($obj['properties'])
                 ? html_writer::div(get_string('nopropertiesassigned', 'local_inventario'), 'text-muted small')
-                : html_writer::alist($obj['properties'], [], 'ul', ['class' => 'small mb-2 text-muted']);
+                : html_writer::alist($obj['properties'], ['class' => 'small mb-2 text-muted'], 'ul');
             $infoicon = html_writer::span('', 'fa fa-info-circle text-info', ['aria-hidden' => 'true']);
             $historyicon = $OUTPUT->pix_icon('i/log', get_string('viewhistory', 'local_inventario'));
             $reservationsicon = $OUTPUT->pix_icon('i/calendar', get_string('reservationslist', 'local_inventario'));
@@ -254,38 +253,6 @@ $tablehtml .= html_writer::end_tag('table');
 
 echo $tablehtml;
 
-$PAGE->requires->js_init_code("
-    const typeRows = document.querySelectorAll('.inventario-type-row');
-    const detailRows = document.querySelectorAll('.inventario-type-objects');
-
-    typeRows.forEach(row => {
-        row.addEventListener('click', () => {
-            const tid = row.dataset.typeid;
-            const target = document.querySelector('.inventario-type-objects[data-typeid=\"' + tid + '\"]');
-            const isOpen = target && target.style.display === 'table-row';
-
-            detailRows.forEach(r => r.style.display = 'none');
-            typeRows.forEach(r => r.classList.remove('open'));
-
-            if (!isOpen && target) {
-                target.style.display = 'table-row';
-                row.classList.add('open');
-            }
-        });
-    });
-
-    document.querySelectorAll('.inventario-object-toggle').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const targetId = btn.dataset.target;
-            const panel = document.getElementById(targetId);
-            if (!panel) {
-                return;
-            }
-            const isVisible = panel.style.display !== 'none';
-            panel.style.display = isVisible ? 'none' : 'block';
-        });
-    });
-");
+$PAGE->requires->js_call_amd('local_inventario/types', 'init');
 
 echo $OUTPUT->footer();

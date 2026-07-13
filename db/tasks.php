@@ -26,15 +26,6 @@ defined('MOODLE_INTERNAL') || die();
 
 $tasks = [
     [
-        'classname' => 'local_inventario\task\license_sync',
-        'blocking' => 0,
-        'minute' => '0',
-        'hour' => '2',
-        'day' => '*',
-        'dayofweek' => '*',
-        'month' => '*',
-    ],
-    [
         'classname' => 'local_inventario\task\expired_reservations_notify',
         'blocking' => 0,
         'minute' => '*/30',
@@ -48,6 +39,15 @@ $tasks = [
         'blocking' => 0,
         'minute' => '0',
         'hour' => '9,18',
+        'day' => '*',
+        'dayofweek' => '*',
+        'month' => '*',
+    ],
+    [
+        'classname' => 'local_inventario\task\archive_expired_absences',
+        'blocking' => 0,
+        'minute' => '*/10',
+        'hour' => '*',
         'day' => '*',
         'dayofweek' => '*',
         'month' => '*',

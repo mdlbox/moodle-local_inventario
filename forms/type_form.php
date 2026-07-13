@@ -58,7 +58,7 @@ class local_inventario_type_form extends moodleform {
         $mform->addRule('name', get_string('required'), 'required');
 
         $mform->addElement('textarea', 'description', get_string('description'), ['rows' => 3, 'cols' => 50]);
-        $mform->setType('description', PARAM_RAW);
+        $mform->setType('description', PARAM_TEXT);
 
         // Color input using native HTML picker (fallback to text if not supported).
         $color = $mform->addElement('text', 'color', get_string('typecolor', 'local_inventario'), [
@@ -113,7 +113,7 @@ class local_inventario_type_form extends moodleform {
             $options,
             ['multiple' => true, 'size' => 8]
         );
-        $mform->setType('properties', PARAM_RAW);
+        $mform->setType('properties', PARAM_TEXT);
 
         $this->add_action_buttons();
     }

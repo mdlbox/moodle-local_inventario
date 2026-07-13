@@ -25,8 +25,9 @@
 require_once(__DIR__ . '/../../config.php');
 require_once(__DIR__ . '/locallib.php');
 
-require_login(null, true);
+require_login();
 $context = context_system::instance();
+require_capability('local/inventario:view', $context);
 $PAGE->set_url(new moodle_url('/local/inventario/public.php'));
 $PAGE->set_context($context);
 $PAGE->set_pagelayout('embedded');
@@ -107,13 +108,17 @@ $rendertable = function (string $title, array $rows): void {
     ];
     $table->data = [];
     foreach ($rows as $row) {
-        $statuslabel = get_string('status_' . $row->status, 'local_inventario');
+        $statuskey = clean_param((string)$row->status, PARAM_ALPHA);
+        if (!in_array($statuskey, ['available', 'reserved', 'offsite', 'active', 'returned'], true)) {
+            $statuskey = 'available';
+        }
+        $statuslabel = get_string('status_' . $statuskey, 'local_inventario');
         $class = 'badge bg-secondary text-white';
-        if ($row->status === 'available') {
+        if ($statuskey === 'available') {
             $class = 'badge bg-success text-white';
-        } else if ($row->status === 'reserved' || $row->status === 'active') {
+        } else if ($statuskey === 'reserved' || $statuskey === 'active') {
             $class = 'badge bg-danger text-white';
-        } else if ($row->status === 'offsite') {
+        } else if ($statuskey === 'offsite') {
             $class = 'badge bg-warning text-dark';
         }
         $badge = html_writer::span($statuslabel, $class);

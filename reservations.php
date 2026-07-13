@@ -57,7 +57,6 @@ $PAGE->set_url('/local/inventario/reservations.php', $pageparams);
 $PAGE->set_context($context);
 $PAGE->set_title(get_string('reservations', 'local_inventario'));
 $PAGE->set_heading(get_string('reservations', 'local_inventario'));
-$PAGE->requires->css('/local/inventario/styles.css');
 
 $canmanageall = has_capability('local/inventario:deletereservations', $context);
 $includehidden = local_inventario_can_see_hidden();
@@ -164,6 +163,10 @@ $typesbyid = local_inventario_typeservice()->get_types();
 if ($selectedsite) {
     $objs = $service->get_objects($includehidden, $selectedsite);
     foreach ($objs as $obj) {
+        // Hide objects under maintenance, except the one being edited.
+        if (!empty($obj->inmaintenance) && (!$record || (int)$record->objectid !== (int)$obj->id)) {
+            continue;
+        }
         $objectoptions[$obj->id] = format_string($obj->name);
         $type = $typesbyid[$obj->typeid] ?? null;
         $objectmetadata[$obj->id] = [
@@ -206,12 +209,9 @@ if ($data = $form->get_data()) {
         $service->save_reservation($data, $USER->id, $canmanageall);
         redirect($PAGE->url, get_string('changessaved'), 0);
     } catch (moodle_exception $e) {
-        if ($e->errorcode === 'overlap') {
-            $overlaperror = $e->getMessage();
-            $form->set_data($data);
-        } else {
-            throw $e;
-        }
+        // Show the reason (overlap, availability window, location required, ...) instead of a fatal page.
+        $overlaperror = $e->getMessage();
+        $form->set_data($data);
     }
 }
 
@@ -453,7 +453,7 @@ foreach ($reservations as $reservation) {
         'cells' => [
             html_writer::tag('a', '', ['id' => 'reservation-' . $reservation->id, 'class' => 'reservation-anchor']) .
             format_string($reservation->objectname) . $statusbadge,
-            fullname($reservation),
+            s(fullname($reservation)),
             format_string($reservation->sitename),
             userdate($reservation->timestart) . ' → ' . userdate($reservation->timeend),
             format_string($reservation->location),
@@ -516,13 +516,7 @@ echo html_writer::tag(
 );
 
 if (!empty($overlaperror)) {
-    $escaped = json_encode($overlaperror, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
-    $PAGE->requires->js_init_code(
-        "require(['jquery'], function($) {
-            $('#inventario-overlap-modal-body').text({$escaped});
-            $('#inventario-overlap-modal').modal('show');
-        });"
-    );
+    $PAGE->requires->js_call_amd('local_inventario/overlapmodal', 'init', [$overlaperror]);
 }
 
 echo $OUTPUT->footer();

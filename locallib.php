@@ -32,10 +32,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-require_once(__DIR__ . '/classes/local/license_manager.php');
-require_once(__DIR__ . '/classes/local/inventory_service.php');
-require_once(__DIR__ . '/classes/local/type_service.php');
-
+use local_inventario\local\absence_service;
 use local_inventario\local\inventory_service;
 use local_inventario\local\license_manager;
 use local_inventario\local\type_service;
@@ -103,73 +100,68 @@ function local_inventario_render_nav(\context_system $context): string {
 
     $manager = has_capability('local/inventario:manageobjects', $context);
     $canreserve = has_capability('local/inventario:reserve', $context);
-    $licensemanager = local_inventario_license();
-    $licensestatus = $licensemanager->get_status();
-    $ispro = $licensemanager->is_pro();
-    $hasapikey = !empty($licensestatus->apikey);
+    $absenceservice = new absence_service();
     $activeurl = (!empty($PAGE) && $PAGE->url instanceof moodle_url) ? $PAGE->url->out_as_local_url(false) : null;
 
     // Define nav items in the required order.
+    $publicpageurl = new moodle_url('/local/inventario/publicabsences.php');
+    $publickey = $absenceservice->get_public_key();
+    $publicpageurl->param('k', $publickey);
+
     $items = [
         [
-            'path' => '/local/inventario/index.php',
+            'url' => new moodle_url('/local/inventario/index.php'),
             'label' => html_writer::span('', 'fa-solid fa-warehouse', ['aria-hidden' => 'true']) .
                 html_writer::span(get_string('pluginname', 'local_inventario'), 'sr-only'),
             'show' => ($canreserve || $manager),
         ],
         [
-            'path' => '/local/inventario/properties.php',
+            'url' => new moodle_url('/local/inventario/properties.php'),
             'label' => html_writer::span('', 'fa-solid fa-list-check me-1', ['aria-hidden' => 'true']) .
                 get_string('nav_props', 'local_inventario'),
             'show' => $manager,
         ],
         [
-            'path' => '/local/inventario/types.php',
+            'url' => new moodle_url('/local/inventario/types.php'),
             'label' => html_writer::span('', 'fa-solid fa-layer-group me-1', ['aria-hidden' => 'true']) .
                 get_string('nav_types', 'local_inventario'),
             'show' => $manager,
         ],
         [
-            'path' => '/local/inventario/objects.php',
+            'url' => new moodle_url('/local/inventario/objects.php'),
             'label' => html_writer::span('', 'fa-solid fa-boxes-stacked me-1', ['aria-hidden' => 'true']) .
                 get_string('nav_objects', 'local_inventario'),
             'show' => $manager,
         ],
         [
-            'path' => '/local/inventario/sites.php',
+            'url' => new moodle_url('/local/inventario/sites.php'),
             'label' => html_writer::span('', 'fa-solid fa-location-dot me-1', ['aria-hidden' => 'true']) .
                 get_string('nav_sites', 'local_inventario'),
             'show' => $manager,
         ],
         [
-            'path' => '/local/inventario/reservations.php',
+            'url' => new moodle_url('/local/inventario/reservations.php'),
             'label' => html_writer::span('', 'fa-solid fa-calendar-check me-1', ['aria-hidden' => 'true']) .
                 get_string('nav_booking', 'local_inventario'),
             'show' => ($canreserve || $manager),
         ],
         [
-            'path' => '/local/inventario/reservations_list.php',
+            'url' => new moodle_url('/local/inventario/reservations_list.php'),
             'label' => html_writer::span('', 'fa fa-list-ul me-1', ['aria-hidden' => 'true']) .
                 get_string('nav_list', 'local_inventario'),
             'show' => ($canreserve || $manager),
         ],
         [
-            'path' => '/local/inventario/reservations_calendar.php',
+            'url' => new moodle_url('/local/inventario/reservations_calendar.php'),
             'label' => html_writer::span('', 'fa fa-calendar me-1', ['aria-hidden' => 'true']) .
                 get_string('nav_calendar', 'local_inventario'),
-            'show' => ($canreserve || $manager) && $ispro,
+            'show' => ($canreserve || $manager),
         ],
         [
-            'path' => '/local/inventario/import.php',
+            'url' => new moodle_url('/local/inventario/import.php'),
             'label' => html_writer::span('', 'fa fa-file-import me-1', ['aria-hidden' => 'true']) .
                 html_writer::span('', 'fa fa-file-export me-1', ['aria-hidden' => 'true']) .
                 get_string('nav_csv', 'local_inventario'),
-            'show' => $manager && $ispro && $hasapikey,
-        ],
-        [
-            'path' => '/local/inventario/license.php',
-            'label' => html_writer::span('', 'fa-solid fa-key me-1', ['aria-hidden' => 'true']) .
-                get_string('nav_license', 'local_inventario'),
             'show' => $manager,
         ],
     ];
@@ -182,21 +174,72 @@ function local_inventario_render_nav(\context_system $context): string {
         return '';
     }
 
-    $buttons = [];
-    foreach ($buttonsdata as $item) {
-        $url = new moodle_url($item['path']);
-        $label = $item['label'];
-        $targeturl = $url->out_as_local_url(false);
-        $isactive = $activeurl && (strpos($activeurl, $targeturl) === 0);
-        $classes = 'btn me-2 mb-2 ' . ($isactive ? 'btn-primary active' : 'btn-secondary');
-        $attrs = ['class' => $classes];
-        if ($isactive) {
-            $attrs['aria-current'] = 'page';
+    $render_row = static function (array $data) use ($activeurl) {
+        $buttons = [];
+        foreach ($data as $item) {
+            $url = isset($item['url']) ? $item['url'] : new moodle_url($item['path']);
+            $label = $item['label'];
+            $targeturl = $url->out_as_local_url(false);
+            $isactive = $activeurl && (strpos($activeurl, $targeturl) === 0);
+            $classes = 'btn me-2 mb-2 ' . ($isactive ? 'btn-primary active' : 'btn-secondary');
+            $attrs = ['class' => $classes];
+            if ($isactive) {
+                $attrs['aria-current'] = 'page';
+            }
+            $buttons[] = html_writer::link($url, $label, $attrs);
         }
-        $buttons[] = html_writer::link($url, $label, $attrs);
+        return implode('', $buttons);
+    };
+
+    $mainrow = html_writer::div($render_row($buttonsdata), 'mb-3 inventario-nav');
+
+    $canviewabsences = has_capability('local/inventario:addabsence', $context)
+        || has_capability('local/inventario:manageabsences', $context);
+    $absencerow = '';
+    if ($canviewabsences) {
+        $absenceitems = [
+            [
+                'url' => new moodle_url('/local/inventario/absences.php'),
+                'label' => html_writer::span('', 'fa-solid fa-people-group', ['aria-hidden' => 'true']) .
+                    html_writer::span(get_string('absence_dashboard', 'local_inventario'), 'sr-only'),
+                'show' => true,
+            ],
+            [
+                'url' => new moodle_url('/local/inventario/absence.php'),
+                'label' => html_writer::span('', 'fa-solid fa-calendar-plus me-1', ['aria-hidden' => 'true']) .
+                    get_string('absence_add', 'local_inventario'),
+                'show' => has_capability('local/inventario:addabsence', $context)
+                    || has_capability('local/inventario:manageabsences', $context),
+            ],
+            [
+                'url' => new moodle_url('/local/inventario/absences_archive.php'),
+                'label' => html_writer::span('', 'fa-solid fa-box-archive me-1', ['aria-hidden' => 'true']) .
+                    get_string('absence_archive', 'local_inventario'),
+                'show' => true,
+            ],
+            [
+                'url' => new moodle_url('/local/inventario/absence_settings.php'),
+                'label' => html_writer::span('', 'fa-solid fa-gear me-1', ['aria-hidden' => 'true']) .
+                    get_string('absencesettings', 'local_inventario'),
+                'show' => has_capability('local/inventario:manageabsences', $context),
+            ],
+            [
+                'url' => $publicpageurl,
+                'label' => html_writer::span('', 'fa-solid fa-globe me-1', ['aria-hidden' => 'true']) .
+                    get_string('absence_public_page', 'local_inventario'),
+                'show' => true,
+            ],
+        ];
+
+        $absenceitems = array_filter($absenceitems, static function ($item) {
+            return !empty($item['show']);
+        });
+        if (!empty($absenceitems)) {
+            $absencerow = html_writer::div($render_row($absenceitems), 'mb-3 inventario-absence-nav');
+        }
     }
 
-    return html_writer::div(implode('', $buttons), 'mb-3 inventario-nav');
+    return $mainrow . $absencerow;
 }
 
 /**
@@ -258,6 +301,7 @@ function local_inventario_create_booking_role(): void {
     $caps = [
         'local/inventario:view' => CAP_ALLOW,
         'local/inventario:reserve' => CAP_ALLOW,
+        'local/inventario:addabsence' => CAP_ALLOW,
     ];
     $syscontextid = context_system::instance()->id;
     foreach ($caps as $cap => $perm) {
@@ -267,6 +311,57 @@ function local_inventario_create_booking_role(): void {
         }
         assign_capability($cap, $perm, $roleid, $syscontextid, true);
     }
+}
+
+/**
+ * Wrap a filter form (or filter markup) in the standard filter card.
+ *
+ * Provides a single, uniform chrome (card + "Filters" heading) for every
+ * filter block across the plugin, regardless of how the fields are produced.
+ *
+ * @param string $innerhtml The rendered filter form/markup.
+ * @return string
+ */
+function local_inventario_render_filter_card(string $innerhtml, bool $expanded = false): string {
+    $collapseid = 'inventario-filter-collapse';
+
+    $togglecontent = html_writer::span('', 'fa fa-filter me-2', ['aria-hidden' => 'true']) .
+        get_string('filters', 'local_inventario') .
+        html_writer::span('', 'fa fa-chevron-down ms-auto inventario-filter-chevron', ['aria-hidden' => 'true']);
+
+    // Both Bootstrap 4 (data-*) and 5 (data-bs-*) attributes for theme compatibility.
+    $toggle = html_writer::tag('button', $togglecontent, [
+        'type' => 'button',
+        'class' => 'inventario-filter-toggle' . ($expanded ? '' : ' collapsed'),
+        'data-toggle' => 'collapse',
+        'data-bs-toggle' => 'collapse',
+        'data-target' => '#' . $collapseid,
+        'data-bs-target' => '#' . $collapseid,
+        'aria-expanded' => $expanded ? 'true' : 'false',
+        'aria-controls' => $collapseid,
+    ]);
+
+    $collapse = html_writer::div(
+        html_writer::div($innerhtml, 'card-body'),
+        'collapse' . ($expanded ? ' show' : ''),
+        ['id' => $collapseid]
+    );
+
+    return html_writer::div($toggle . $collapse, 'card mb-3 shadow-sm inventario-filter-card');
+}
+
+/**
+ * File manager / file area options for object photos and attachments.
+ *
+ * @return array
+ */
+function local_inventario_object_file_options(): array {
+    return [
+        'subdirs' => 0,
+        'maxbytes' => 0,
+        'maxfiles' => 10,
+        'accepted_types' => ['web_image', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt'],
+    ];
 }
 
 /**

@@ -27,19 +27,6 @@ defined('MOODLE_INTERNAL') || die();
 if ($hassiteconfig) {
     $settings = new admin_settingpage('local_inventario', get_string('pluginname', 'local_inventario'));
 
-    $settings->add(new admin_setting_heading(
-        'local_inventario/apilockinfo',
-        get_string('apiendpoint', 'local_inventario'),
-        get_string('apiendpoint_desc', 'local_inventario')
-    ));
-    $settings->add(new admin_setting_configtext(
-        'local_inventario/checkinterval',
-        get_string('checkinterval', 'local_inventario'),
-        get_string('checkinterval_desc', 'local_inventario'),
-        3600,
-        PARAM_INT
-    ));
-
     $settings->add(new admin_setting_configcheckbox(
         'local_inventario/allowperiodic',
         get_string('allowperiodic', 'local_inventario'),
@@ -63,23 +50,14 @@ if ($hassiteconfig) {
         'local_inventario/confirmation_subject_template',
         get_string('reservationconfirmation_subject', 'local_inventario'),
         get_string('reservationconfirmation_tokens', 'local_inventario'),
-        'Prenotazione confermata: {object}'
+        get_string('confirmation_subject_default', 'local_inventario')
     ));
     $settings->add(new admin_setting_configtextarea(
         'local_inventario/confirmation_body_template',
         get_string('reservationconfirmation_body', 'local_inventario'),
         get_string('reservationconfirmation_tokens', 'local_inventario'),
-        "Ciao {userfullname},\n\n" .
-            "La tua prenotazione è stata registrata.\n\n" .
-            "- Oggetto: {object}\n" .
-            "- Tipo: {type}\n" .
-            "- Sede: {site}\n" .
-            "- Luogo di utilizzo: {location}\n" .
-            "- Periodo: {start} - {end}\n\n" .
-            "Dettagli oggetto:\n" .
-            "{properties}\n\n" .
-            "Gestisci prenotazione: {reservationurl}",
-        PARAM_RAW,
+        get_string('confirmation_body_default', 'local_inventario'),
+        PARAM_TEXT,
         60,
         8
     ));
@@ -93,15 +71,14 @@ if ($hassiteconfig) {
         'local_inventario/overdue_subject_template',
         get_string('overdue_subject_template', 'local_inventario'),
         get_string('notificationtokenshint', 'local_inventario'),
-        'Reservation overdue: {object}'
+        get_string('overdue_subject_default', 'local_inventario')
     ));
     $settings->add(new admin_setting_configtextarea(
         'local_inventario/overdue_body_template',
         get_string('overdue_body_template', 'local_inventario'),
         get_string('notificationtokenshint', 'local_inventario'),
-        'Your reservation for "{object}" is overdue since {end}. ' .
-            'Please return the object or update the reservation: {reservationurl}',
-        PARAM_RAW,
+        get_string('overdue_body_default', 'local_inventario'),
+        PARAM_TEXT,
         60,
         4
     ));
@@ -109,14 +86,14 @@ if ($hassiteconfig) {
         'local_inventario/expired_subject_template',
         get_string('expired_subject_template', 'local_inventario'),
         get_string('notificationtokenshint', 'local_inventario'),
-        'Reservation expired: {object}'
+        get_string('expired_subject_default', 'local_inventario')
     ));
     $settings->add(new admin_setting_configtextarea(
         'local_inventario/expired_body_template',
         get_string('expired_body_template', 'local_inventario'),
         get_string('notificationtokenshint', 'local_inventario'),
-        'Your reservation for "{object}" expired on {end}. Manage it here: {reservationurl}',
-        PARAM_RAW,
+        get_string('expired_body_default', 'local_inventario'),
+        PARAM_TEXT,
         60,
         4
     ));
@@ -126,5 +103,44 @@ if ($hassiteconfig) {
         get_string('allowpublicpage_desc', 'local_inventario'),
         0
     ));
+
+    $settings->add(new admin_setting_heading(
+        'local_inventario/calendarheading',
+        get_string('calendarsettings', 'local_inventario'),
+        get_string('calendarsettings_desc', 'local_inventario')
+    ));
+    $settings->add(new admin_setting_configselect(
+        'local_inventario/calendar_defaultview',
+        get_string('calendar_defaultview', 'local_inventario'),
+        get_string('calendar_defaultview_desc', 'local_inventario'),
+        'month',
+        [
+            'month' => get_string('calendarview_month', 'local_inventario'),
+            'week' => get_string('calendarview_week', 'local_inventario'),
+            'day' => get_string('calendarview_day', 'local_inventario'),
+        ]
+    ));
+    $settings->add(new admin_setting_configtext(
+        'local_inventario/calendar_daystart',
+        get_string('calendar_daystart', 'local_inventario'),
+        get_string('calendar_daystart_desc', 'local_inventario'),
+        7,
+        PARAM_INT
+    ));
+    $settings->add(new admin_setting_configtext(
+        'local_inventario/calendar_dayend',
+        get_string('calendar_dayend', 'local_inventario'),
+        get_string('calendar_dayend_desc', 'local_inventario'),
+        20,
+        PARAM_INT
+    ));
+    $settings->add(new admin_setting_configtext(
+        'local_inventario/calendar_slotminutes',
+        get_string('calendar_slotminutes', 'local_inventario'),
+        get_string('calendar_slotminutes_desc', 'local_inventario'),
+        45,
+        PARAM_INT
+    ));
+
     $ADMIN->add('localplugins', $settings);
 }

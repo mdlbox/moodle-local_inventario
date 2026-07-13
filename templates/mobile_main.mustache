@@ -1,0 +1,73 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template local_inventario/mobile_main
+
+    Inventario main view for the Moodle Mobile app.
+
+    Context variables required for this template:
+    * reservations - array of upcoming reservations for the user
+    * hasreservations - bool
+    * showabsences - bool (Pro)
+    * absences - array of today's absences
+    * hasabsences - bool
+}}
+<ion-card>
+    <ion-card-header>
+        <ion-card-title>{{#str}} mobile_myreservations, local_inventario {{/str}}</ion-card-title>
+    </ion-card-header>
+    <ion-list>
+        {{#reservations}}
+        <ion-item>
+            <ion-label>
+                <h2>{{object}}</h2>
+                <p>{{period}}</p>
+                {{#site}}<p class="ion-text-wrap"><ion-icon name="location-outline"></ion-icon> {{site}}{{#location}} &middot; {{location}}{{/location}}</p>{{/site}}
+            </ion-label>
+        </ion-item>
+        {{/reservations}}
+        {{^hasreservations}}
+        <ion-item>
+            <ion-label class="text-muted">{{#str}} calendarnoreservations, local_inventario {{/str}}</ion-label>
+        </ion-item>
+        {{/hasreservations}}
+    </ion-list>
+</ion-card>
+
+{{#showabsences}}
+<ion-card>
+    <ion-card-header>
+        <ion-card-title>{{#str}} mobile_todayabsences, local_inventario {{/str}}</ion-card-title>
+    </ion-card-header>
+    <ion-list>
+        {{#absences}}
+        <ion-item>
+            <ion-label>
+                <h2>{{teacher}}</h2>
+                <p>{{subject}} &middot; {{period}}</p>
+                {{#hassubstitute}}<p><ion-icon name="person-outline"></ion-icon> {{substitute}}</p>{{/hassubstitute}}
+            </ion-label>
+        </ion-item>
+        {{/absences}}
+        {{^hasabsences}}
+        <ion-item>
+            <ion-label class="text-muted">{{#str}} noabsencesyet, local_inventario {{/str}}</ion-label>
+        </ion-item>
+        {{/hasabsences}}
+    </ion-list>
+</ion-card>
+{{/showabsences}}

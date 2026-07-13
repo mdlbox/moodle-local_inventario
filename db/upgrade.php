@@ -312,17 +312,112 @@ function xmldb_local_inventario_upgrade(int $oldversion): bool {
     }
 
     if ($oldversion < 2025122211) {
-        require_once(__DIR__ . '/../classes/local/license_manager.php');
-        $defaultkey = \local_inventario\local\license_manager::default_free_key();
-        $records = $DB->get_records_select('local_inventario_license', "apikey IS NULL OR apikey = ''");
-        $now = time();
-        foreach ($records as $record) {
-            $record->apikey = $defaultkey;
-            $record->status = 'free';
-            $record->timemodified = $now;
-            $DB->update_record('local_inventario_license', $record);
-        }
+        // Historical no-op: the external licence table has since been removed.
         upgrade_plugin_savepoint(true, 2025122211, 'local', 'inventario');
     }
+    $legacytable = new xmldb_table('local_inventario_absence_types');
+    $table = new xmldb_table('local_inventario_abs_types');
+    if ($dbman->table_exists($legacytable) && !$dbman->table_exists($table)) {
+        $dbman->rename_table($legacytable, $table);
+    }
+
+    if ($oldversion < 2026010500) {
+        if (!$dbman->table_exists($table)) {
+            $table->add_field('id', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL, XMLDB_SEQUENCE);
+            $table->add_field('name', XMLDB_TYPE_CHAR, '255', XMLDB_NOTNULL, null, null, '');
+            $table->add_field('color', XMLDB_TYPE_CHAR, '20', XMLDB_NOTNULL, null, null, '#2563eb');
+            $table->add_field('requiresubstitute', XMLDB_TYPE_INTEGER, '1', XMLDB_NOTNULL, null, null, '0');
+            $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL, null, null, 0);
+            $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL, null, null, 0);
+            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $dbman->create_table($table);
+        }
+        $absence = new xmldb_table('local_inventario_absences');
+        if (!$dbman->table_exists($absence)) {
+            $absence->add_field('id', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL, XMLDB_SEQUENCE);
+            $absence->add_field('userid', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL, null, null, 0);
+            $absence->add_field('typeid', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL, null, null, 0);
+            $absence->add_field('subject', XMLDB_TYPE_CHAR, '255', XMLDB_NOTNULL, null, null, '');
+            $absence->add_field('timestart', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL, null, null, 0);
+            $absence->add_field('timeend', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL, null, null, 0);
+            $absence->add_field('substituteuserid', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL, null, null, 0);
+            $absence->add_field('substitutename', XMLDB_TYPE_CHAR, '255', null);
+            $absence->add_field('comment', XMLDB_TYPE_TEXT, null);
+            $absence->add_field('createdby', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL, null, null, 0);
+            $absence->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL, null, null, 0);
+            $absence->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL, null, null, 0);
+            $absence->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $absence->add_key('userfk', XMLDB_KEY_FOREIGN, ['userid'], 'user', ['id']);
+            $absence->add_key('substitutefk', XMLDB_KEY_FOREIGN, ['substituteuserid'], 'user', ['id']);
+            $absence->add_key('typefk', XMLDB_KEY_FOREIGN, ['typeid'], 'local_inventario_abs_types', ['id']);
+            $absence->add_index('absence_period_idx', XMLDB_INDEX_NOTUNIQUE, ['timestart', 'timeend']);
+            $dbman->create_table($absence);
+        }
+        if (function_exists('local_inventario_create_booking_role')) {
+            local_inventario_create_booking_role();
+        }
+        upgrade_plugin_savepoint(true, 2026010500, 'local', 'inventario');
+    }
+    if ($oldversion < 2026010800) {
+        upgrade_plugin_savepoint(true, 2026010800, 'local', 'inventario');
+    }
+
+    if ($oldversion < 2026022000) {
+        $absence = new xmldb_table('local_inventario_absences');
+        if ($dbman->table_exists($absence)) {
+            $archived = new xmldb_field('archived', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, 0, 'timemodified');
+            if (!$dbman->field_exists($absence, $archived)) {
+                $dbman->add_field($absence, $archived);
+            }
+
+            $timearchived = new xmldb_field('timearchived', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, 0, 'archived');
+            if (!$dbman->field_exists($absence, $timearchived)) {
+                $dbman->add_field($absence, $timearchived);
+            }
+
+            $archiveindex = new xmldb_index('absence_archive_idx', XMLDB_INDEX_NOTUNIQUE, ['archived', 'timeend']);
+            if (!$dbman->index_exists($absence, $archiveindex)) {
+                $dbman->add_index($absence, $archiveindex);
+            }
+        }
+
+        upgrade_plugin_savepoint(true, 2026022000, 'local', 'inventario');
+    }
+
+    if ($oldversion < 2026022007) {
+        $table = new xmldb_table('local_inventario_objects');
+
+        $itemcondition = new xmldb_field('itemcondition', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, 'good', 'timemodified');
+        if (!$dbman->field_exists($table, $itemcondition)) {
+            $dbman->add_field($table, $itemcondition);
+        }
+
+        $inmaintenance = new xmldb_field('inmaintenance', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, 0, 'itemcondition');
+        if (!$dbman->field_exists($table, $inmaintenance)) {
+            $dbman->add_field($table, $inmaintenance);
+        }
+
+        $maintenancenote = new xmldb_field('maintenancenote', XMLDB_TYPE_TEXT, null, null, null, null, null, 'inmaintenance');
+        if (!$dbman->field_exists($table, $maintenancenote)) {
+            $dbman->add_field($table, $maintenancenote);
+        }
+
+        upgrade_plugin_savepoint(true, 2026022007, 'local', 'inventario');
+    }
+
+    if ($oldversion < 2026022013) {
+        // Remove the legacy external licensing / install-registration tables.
+        foreach (['local_inventario_license', 'local_inventario_install'] as $droptable) {
+            $xmldbtable = new xmldb_table($droptable);
+            if ($dbman->table_exists($xmldbtable)) {
+                $dbman->drop_table($xmldbtable);
+            }
+        }
+        // Drop settings that only configured the external licence backend.
+        unset_config('checkinterval', 'local_inventario');
+        unset_config('forcedomain', 'local_inventario');
+        upgrade_plugin_savepoint(true, 2026022013, 'local', 'inventario');
+    }
+
     return true;
 }

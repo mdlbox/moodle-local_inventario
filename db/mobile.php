@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Form to edit license/API key settings.
+ * Moodle Mobile app addons for local_inventario.
  *
  * @package   local_inventario
  * @copyright 2026 mdlbox - https://mdlbox.com
@@ -24,22 +24,26 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-require_once($CFG->libdir . '/formslib.php');
-
-/**
- * Form per la licenza/API Key.
- */
-class local_inventario_license_form extends moodleform {
-    /**
-     * Define form fields.
-     */
-    public function definition() {
-        $mform = $this->_form;
-
-        $mform->addElement('text', 'apikey', get_string('apikey', 'local_inventario'), ['size' => 50]);
-        $mform->setType('apikey', PARAM_TEXT);
-        $mform->addRule('apikey', get_string('required'), 'required');
-
-        $this->add_action_buttons();
-    }
-}
+$addons = [
+    'local_inventario' => [
+        'handlers' => [
+            'inventarioview' => [
+                'displaydata' => [
+                    'title' => 'pluginname',
+                    'icon' => 'fas fa-warehouse',
+                    'class' => '',
+                ],
+                'delegate' => 'CoreMainMenuDelegate',
+                'method' => 'local_inventario_mobile_inventario_view',
+                'init' => null,
+            ],
+        ],
+        'lang' => [
+            ['pluginname', 'local_inventario'],
+            ['mobile_myreservations', 'local_inventario'],
+            ['mobile_todayabsences', 'local_inventario'],
+            ['calendarnoreservations', 'local_inventario'],
+            ['noabsencesyet', 'local_inventario'],
+        ],
+    ],
+];

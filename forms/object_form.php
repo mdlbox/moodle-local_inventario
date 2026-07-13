@@ -101,11 +101,37 @@ class local_inventario_object_form extends moodleform {
         $mform->addRule('name', get_string('required'), 'required');
 
         $mform->addElement('textarea', 'description', get_string('description'), ['rows' => 4, 'cols' => 50]);
-        $mform->setType('description', PARAM_RAW);
+        $mform->setType('description', PARAM_TEXT);
         // Stato mantenuto come hidden: gli oggetti nuovi partono da "available".
         $mform->addElement('hidden', 'status', 'available');
         $mform->setType('status', PARAM_ALPHA);
         $mform->setDefault('status', 'available');
+
+        $conditionoptions = [
+            'new' => get_string('condition_new', 'local_inventario'),
+            'good' => get_string('condition_good', 'local_inventario'),
+            'fair' => get_string('condition_fair', 'local_inventario'),
+            'poor' => get_string('condition_poor', 'local_inventario'),
+        ];
+        $mform->addElement('select', 'itemcondition', get_string('condition', 'local_inventario'), $conditionoptions);
+        $mform->setType('itemcondition', PARAM_ALPHA);
+        $mform->setDefault('itemcondition', 'good');
+
+        $maintenanceel = $mform->createElement('advcheckbox', 'inmaintenance', '', '', ['class' => 'inventario-switch']);
+        $mform->addGroup([$maintenanceel], 'inmaintenance_group', get_string('inmaintenance', 'local_inventario'), '', false);
+        $mform->setType('inmaintenance', PARAM_BOOL);
+        $mform->setDefault('inmaintenance', 0);
+        $mform->addElement('textarea', 'maintenancenote', get_string('maintenancenote', 'local_inventario'), ['rows' => 2, 'cols' => 50]);
+        $mform->setType('maintenancenote', PARAM_TEXT);
+        $mform->hideIf('maintenancenote', 'inmaintenance', 'notchecked');
+
+        $mform->addElement(
+            'filemanager',
+            'objectfiles',
+            get_string('objectfiles', 'local_inventario'),
+            null,
+            local_inventario_object_file_options()
+        );
 
         if ($this->ispro) {
             $mform->addElement('header', 'availabilityheader', get_string('availability', 'local_inventario'));
@@ -134,7 +160,7 @@ class local_inventario_object_form extends moodleform {
                 ['rows' => 3, 'cols' => 40, 'placeholder' => "09:00-12:00\n14:00-18:00"]
             );
             $mform->addHelpButton('availabletimes', 'availability_times', 'local_inventario');
-            $mform->setType('availabletimes', PARAM_RAW);
+            $mform->setType('availabletimes', PARAM_TEXT);
             $mform->hideIf('availablefrom', 'availableperiodenabled', 'notchecked');
             $mform->hideIf('availableto', 'availableperiodenabled', 'notchecked');
             $mform->hideIf('availabletimes', 'availableperiodenabled', 'notchecked');
@@ -170,7 +196,7 @@ class local_inventario_object_form extends moodleform {
                     break;
                 case 'number':
                     $mform->addElement('text', $elementname, $label);
-                    $mform->setType($elementname, PARAM_RAW);
+                    $mform->setType($elementname, PARAM_TEXT);
                     break;
                 case 'bool':
                     $propel = $mform->createElement(

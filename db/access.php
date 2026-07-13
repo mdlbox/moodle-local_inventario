@@ -43,6 +43,24 @@ $capabilities = [
         'clonepermissionsfrom' => 'moodle/course:view',
     ],
 
+    'local/inventario:addabsence' => [
+        'riskbitmask' => RISK_SPAM,
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_SYSTEM,
+        'archetypes' => [
+            'manager' => CAP_ALLOW,
+        ],
+    ],
+
+    'local/inventario:manageabsences' => [
+        'riskbitmask' => RISK_DATALOSS | RISK_PERSONAL,
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_SYSTEM,
+        'archetypes' => [
+            'manager' => CAP_ALLOW,
+        ],
+    ],
+
     'local/inventario:manageobjects' => [
         'riskbitmask' => RISK_CONFIG | RISK_PERSONAL,
         'captype' => 'write',
@@ -88,12 +106,4 @@ $capabilities = [
         ],
     ],
 
-    'local/inventario:managelicense' => [
-        'riskbitmask' => RISK_CONFIG,
-        'captype' => 'write',
-        'contextlevel' => CONTEXT_SYSTEM,
-        'archetypes' => [
-            'manager' => CAP_ALLOW,
-        ],
-    ],
 ];

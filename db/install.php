@@ -37,7 +37,7 @@ require_once(__DIR__ . '/../locallib.php');
  * Post-install actions.
  */
 function xmldb_local_inventario_install(): bool {
-    global $DB, $CFG;
+    global $DB;
 
     $now = time();
 
@@ -50,60 +50,9 @@ function xmldb_local_inventario_install(): bool {
         $DB->insert_record('local_inventario_sites', $site);
     }
 
-    $licenseid = null;
-    if (!$DB->record_exists('local_inventario_license', [])) {
-        $domain = local_inventario_current_domain();
-        $license = (object)[
-            'apikey' => null,
-            'domain' => $domain ?: '',
-            'status' => 'free',
-            'expiresat' => null,
-            'installid' => null,
-            'issuedat' => 0,
-            'protoken' => null,
-            'protokenexpires' => 0,
-            'limitsjson' => null,
-            'signature' => null,
-            'lastcheck' => $now,
-            'lasttamper' => 0,
-            'lastpayload' => null,
-            'timecreated' => $now,
-            'timemodified' => $now,
-        ];
-        $licenseid = $DB->insert_record('local_inventario_license', $license);
-    } else {
-        $licenseid = (int)$DB->get_field('local_inventario_license', 'id', []);
-    }
-
-    $install = (object)[
-        'installid' => null,
-        'domain' => local_inventario_current_domain() ?: '',
-        'version' => $CFG->version,
-        'installedat' => $now,
-        'lastreported' => 0,
-        'status' => 'created',
-    ];
-    $DB->insert_record('local_inventario_install', $install);
-
     // Create booking-only global role.
     if (function_exists('local_inventario_create_booking_role')) {
         local_inventario_create_booking_role();
-    }
-
-    // Try to register the installation with the external backend if already configured.
-    try {
-        require_once(__DIR__ . '/../classes/local/api_client.php');
-        $client = new \local_inventario\local\api_client();
-        if ($client->is_configured()) {
-            $response = $client->register_installation($install->domain, (string)$CFG->version);
-            if (!empty($response['installid']) && !empty($licenseid)) {
-                $licenserec = $DB->get_record('local_inventario_license', ['id' => $licenseid]);
-                $licenserec->installid = $response['installid'];
-                $DB->update_record('local_inventario_license', $licenserec);
-            }
-        }
-    } catch (\Throwable $ignored) {
-        debugging($ignored->getMessage(), DEBUG_DEVELOPER);
     }
 
     return true;

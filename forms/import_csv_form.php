@@ -39,9 +39,30 @@ class local_inventario_import_csv_form extends moodleform {
      * @param string $action
      * @param array $customdata
      */
-    public function __construct($action, array $customdata) {
+    public function __construct(
+        $action,
+        array $customdata = [],
+        $method = 'post',
+        $target = '',
+        $attributes = null,
+        $editable = true,
+        $ajaxformdata = null
+    ) {
         $this->kind = $customdata['kind'] ?? '';
-        parent::__construct($action, $customdata);
+        parent::__construct($action, $customdata, $method, $target, $attributes, $editable, $ajaxformdata);
+    }
+
+    /**
+     * Return unique form identifier to support multiple import forms in one page.
+     *
+     * @return string
+     */
+    protected function get_form_identifier() {
+        $suffix = preg_replace('/[^a-z0-9_]/i', '_', (string)$this->kind);
+        if ($suffix === '') {
+            $suffix = 'generic';
+        }
+        return parent::get_form_identifier() . '_' . strtolower($suffix);
     }
 
     /**

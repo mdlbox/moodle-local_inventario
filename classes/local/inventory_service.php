@@ -164,6 +164,10 @@ class inventory_service {
             $this->license->enforce_limit($count, 'objects');
         }
 
+        $existing = !empty($data->id)
+            ? ($DB->get_record('local_inventario_objects', ['id' => (int)$data->id]) ?: null)
+            : null;
+
         $availableenabled = $this->license->is_feature_enabled('availability') && !empty($data->availableperiodenabled);
         $availablefrom = $availableenabled ? (int)($data->availablefrom ?? 0) : 0;
         $availableto = $availableenabled ? (int)($data->availableto ?? 0) : 0;
@@ -189,6 +193,15 @@ class inventory_service {
             'availablefrom' => $availableenabled ? $availablefrom : 0,
             'availableto' => $availableenabled ? $availableto : 0,
             'availabletimes' => $availableenabled ? trim($availableslotsraw) : '',
+            'itemcondition' => isset($data->itemcondition)
+                ? $this->clean_condition($data->itemcondition)
+                : ($existing->itemcondition ?? 'good'),
+            'inmaintenance' => isset($data->inmaintenance)
+                ? (!empty($data->inmaintenance) ? 1 : 0)
+                : (int)($existing->inmaintenance ?? 0),
+            'maintenancenote' => isset($data->inmaintenance)
+                ? (!empty($data->inmaintenance) ? trim((string)($data->maintenancenote ?? '')) : '')
+                : (string)($existing->maintenancenote ?? ''),
             'timemodified' => $now,
         ];
 
@@ -205,12 +218,21 @@ class inventory_service {
         if (!empty($data->id)) {
             $record->id = (int)$data->id;
             $DB->update_record('local_inventario_objects', $record);
+            \local_inventario\event\object_updated::create([
+                'objectid' => $record->id,
+                'context' => context_system::instance(),
+            ])->trigger();
             return $record->id;
         }
 
         $record->timecreated = $now;
         $record->createdby = $userid;
-        return $DB->insert_record('local_inventario_objects', $record);
+        $record->id = $DB->insert_record('local_inventario_objects', $record);
+        \local_inventario\event\object_created::create([
+            'objectid' => $record->id,
+            'context' => context_system::instance(),
+        ])->trigger();
+        return $record->id;
     }
 
     /**
@@ -221,9 +243,74 @@ class inventory_service {
     public function delete_object(int $id): void {
         global $DB;
         require_capability('local/inventario:manageobjects', context_system::instance());
+        $object = $DB->get_record('local_inventario_objects', ['id' => $id]);
         $DB->delete_records('local_inventario_reserv', ['objectid' => $id]);
         $DB->delete_records('local_inventario_propvals', ['objectid' => $id]);
         $DB->delete_records('local_inventario_objects', ['id' => $id]);
+        if ($object) {
+            \local_inventario\event\object_deleted::create([
+                'objectid' => $id,
+                'context' => context_system::instance(),
+                'other' => ['name' => $object->name],
+            ])->trigger();
+        }
+    }
+
+    /**
+     * Normalise a physical condition value.
+     *
+     * @param mixed $value
+     * @return string
+     */
+    private function clean_condition($value): string {
+        $value = (string)$value;
+        return in_array($value, ['new', 'good', 'fair', 'poor'], true) ? $value : 'good';
+    }
+
+    /**
+     * Apply a bulk action to a list of objects.
+     *
+     * @param int[] $objectids
+     * @param string $action delete|show|hide|maintenance_on|maintenance_off
+     * @return int Number of affected objects.
+     * @throws moodle_exception
+     */
+    public function bulk_action(array $objectids, string $action): int {
+        global $DB;
+        require_capability('local/inventario:manageobjects', context_system::instance());
+
+        if (!in_array($action, ['delete', 'show', 'hide', 'maintenance_on', 'maintenance_off'], true)) {
+            throw new moodle_exception('invalidaction', 'local_inventario');
+        }
+
+        $count = 0;
+        foreach ($objectids as $objectid) {
+            $objectid = (int)$objectid;
+            $object = $objectid > 0 ? $DB->get_record('local_inventario_objects', ['id' => $objectid]) : null;
+            if (!$object) {
+                continue;
+            }
+
+            if ($action === 'delete') {
+                $this->delete_object($objectid);
+                $count++;
+                continue;
+            }
+
+            if ($action === 'show' || $action === 'hide') {
+                $object->visible = $action === 'show' ? 1 : 0;
+            } else {
+                $object->inmaintenance = $action === 'maintenance_on' ? 1 : 0;
+            }
+            $object->timemodified = time();
+            $DB->update_record('local_inventario_objects', $object);
+            \local_inventario\event\object_updated::create([
+                'objectid' => $objectid,
+                'context' => context_system::instance(),
+            ])->trigger();
+            $count++;
+        }
+        return $count;
     }
 
     /**
@@ -334,10 +421,9 @@ class inventory_service {
         }
 
         // Clean orphan values (oggetti eliminati).
-        $DB->execute(
-            "DELETE FROM {local_inventario_propvals}
-                       WHERE propertyid = :pid
-                         AND objectid NOT IN (SELECT id FROM {local_inventario_objects})",
+        $DB->delete_records_select(
+            'local_inventario_propvals',
+            'propertyid = :pid AND objectid NOT IN (SELECT id FROM {local_inventario_objects})',
             ['pid' => $id]
         );
 
@@ -480,6 +566,9 @@ class inventory_service {
         if (!$object->visible && !$canmanageall) {
             throw new moodle_exception('hiddenobject', 'local_inventario');
         }
+        if (!empty($object->inmaintenance)) {
+            throw new moodle_exception('objectinmaintenance', 'local_inventario');
+        }
         $type = $DB->get_record('local_inventario_types', ['id' => $object->typeid]);
         $requireslocation = $type && property_exists($type, 'requireslocation')
             ? (int)$type->requireslocation
@@ -538,7 +627,7 @@ class inventory_service {
                 $rec = (object)[
                     'objectid' => $object->id,
                     'userid' => $useridtarget,
-                    'siteid' => (int)($data->siteid ?: $object->siteid),
+                    'siteid' => (int)(($data->siteid ?? 0) ?: $object->siteid),
                     'timestart' => $ts,
                     'timeend' => $te,
                     'location' => $cleanlocation,
@@ -547,6 +636,7 @@ class inventory_service {
                     'timemodified' => time(),
                 ];
                 $newid = $DB->insert_record('local_inventario_reserv', $rec);
+                $this->trigger_reservation_created((int)$newid, (int)$object->id);
                 if ($firstreservation === null) {
                     $rec->id = $newid;
                     $firstreservation = $rec;
@@ -565,7 +655,7 @@ class inventory_service {
         $record = (object)[
             'objectid' => $object->id,
             'userid' => $useridtarget,
-            'siteid' => (int)($data->siteid ?: $object->siteid),
+            'siteid' => (int)(($data->siteid ?? 0) ?: $object->siteid),
             'timestart' => $timestart,
             'timeend' => $timeend,
             'location' => $cleanlocation,
@@ -585,9 +675,76 @@ class inventory_service {
         $record->timecreated = time();
         $reservationid = $DB->insert_record('local_inventario_reserv', $record);
         $record->id = $reservationid;
+        $this->trigger_reservation_created((int)$reservationid, (int)$object->id);
         $this->mark_object_reserved($object->id);
         $this->send_reservation_confirmation($record, $object, $useridtarget);
         return $reservationid;
+    }
+
+    /**
+     * Trigger the reservation_created event.
+     *
+     * @param int $reservationid
+     * @param int $objectid
+     */
+    private function trigger_reservation_created(int $reservationid, int $objectid): void {
+        \local_inventario\event\reservation_created::create([
+            'objectid' => $reservationid,
+            'context' => context_system::instance(),
+            'other' => ['inventoryobjectid' => $objectid],
+        ])->trigger();
+    }
+
+    /**
+     * Trigger the reservation_cancelled event.
+     *
+     * @param int $reservationid
+     * @param int $objectid
+     */
+    private function trigger_reservation_cancelled(int $reservationid, int $objectid): void {
+        \local_inventario\event\reservation_cancelled::create([
+            'objectid' => $reservationid,
+            'context' => context_system::instance(),
+            'other' => ['inventoryobjectid' => $objectid],
+        ])->trigger();
+    }
+
+    /**
+     * Create one reservation per object for the same time range.
+     *
+     * Each object is validated independently (overlap, availability, location,
+     * permissions) by {@see save_reservation}; failures are collected per object
+     * so a single conflict does not abort the whole batch.
+     *
+     * @param int[] $objectids
+     * @param stdClass $base Shared payload (siteid, timestart, timeend, location, status, userid).
+     * @param int $userid Acting user id.
+     * @param bool $canmanageall Whether the user can reserve on behalf of others.
+     * @return array{created:int,errors:array<int,array{objectid:int,message:string}>}
+     */
+    public function create_reservations_bulk(array $objectids, stdClass $base, int $userid, bool $canmanageall): array {
+        $created = 0;
+        $errors = [];
+        $seen = [];
+        foreach ($objectids as $objectid) {
+            $objectid = (int)$objectid;
+            if ($objectid <= 0 || isset($seen[$objectid])) {
+                continue;
+            }
+            $seen[$objectid] = true;
+
+            $data = clone $base;
+            $data->objectid = $objectid;
+            unset($data->id, $data->periodic, $data->repeatcount, $data->repeatdays);
+
+            try {
+                $this->save_reservation($data, $userid, $canmanageall);
+                $created++;
+            } catch (moodle_exception $e) {
+                $errors[] = ['objectid' => $objectid, 'message' => $e->getMessage()];
+            }
+        }
+        return ['created' => $created, 'errors' => $errors];
     }
 
     /**
@@ -685,20 +842,10 @@ class inventory_service {
             }
         }
 
-        static $hasrequireslocation = null;
-        if ($hasrequireslocation === null) {
-            $dbman = $DB->get_manager();
-            $hasrequireslocation = $dbman->field_exists(
-                new \xmldb_table('local_inventario_types'),
-                new \xmldb_field('requireslocation')
-            );
-        }
-        $requireslocationselect = $hasrequireslocation ? 't.requireslocation' : '1 AS requireslocation';
-
         $sql = "SELECT r.*,
                        u.firstname, u.lastname, u.middlename, u.alternatename, u.firstnamephonetic, u.lastnamephonetic,
                        o.name AS objectname, s.name AS sitename, o.typeid,
-                       t.name AS typename, t.color AS typecolor, t.requiresreturn, {$requireslocationselect}
+                       t.name AS typename, t.color AS typecolor, t.requiresreturn, t.requireslocation
                   FROM {local_inventario_reserv} r
                   JOIN {local_inventario_objects} o ON o.id = r.objectid
                   JOIN {user} u ON u.id = r.userid
@@ -795,7 +942,7 @@ class inventory_service {
         $content = file_get_contents($filepath);
         $delimiter = $this->detect_csv_delimiter($content);
         $cir->load_csv_content($content, 'utf-8', $delimiter);
-        $columns = array_map('trim', $cir->get_columns() ?? []);
+        $columns = $this->normalise_csv_columns($cir->get_columns() ?? []);
 
         $required = ['name', 'shortname', 'datatype'];
         foreach ($required as $req) {
@@ -876,7 +1023,7 @@ class inventory_service {
         $content = file_get_contents($filepath);
         $delimiter = $this->detect_csv_delimiter($content);
         $cir->load_csv_content($content, 'utf-8', $delimiter);
-        $columns = array_map('trim', $cir->get_columns() ?? []);
+        $columns = $this->normalise_csv_columns($cir->get_columns() ?? []);
         $lowercolumns = array_map('strtolower', $columns);
         $types = $DB->get_records_menu('local_inventario_types', null, '', 'name,id');
         $sites = $DB->get_records_menu('local_inventario_sites', null, '', 'name,id');
@@ -995,6 +1142,20 @@ class inventory_service {
         $commacount = substr_count($firstline, ',');
         $semicoloncount = substr_count($firstline, ';');
         return $semicoloncount > $commacount ? 'semicolon' : 'comma';
+    }
+
+    /**
+     * Normalise CSV header names by trimming whitespace and removing UTF-8 BOM.
+     *
+     * @param array $columns
+     * @return array
+     */
+    private function normalise_csv_columns(array $columns): array {
+        return array_map(static function($column): string {
+            $value = (string)$column;
+            $value = preg_replace('/^\xEF\xBB\xBF/u', '', $value) ?? $value;
+            return trim($value);
+        }, $columns);
     }
 
     /**
@@ -1142,22 +1303,19 @@ class inventory_service {
         $DB->update_record('local_inventario_reserv', $reservation);
 
         // Also mark all previous reservations for the same object as returned to avoid multiple pending returns.
-        $DB->execute(
-            "UPDATE {local_inventario_reserv}
-                SET status = 'returned', timemodified = :now
-              WHERE objectid = :objectid
-                AND status <> 'returned'
-                AND id <> :id
-                AND timestart <= :timestart",
-            [
-                'now' => $now,
-                'objectid' => $reservation->objectid,
-                'id' => $reservation->id,
-                'timestart' => $reservation->timestart,
-            ]
-        );
+        $select = 'objectid = :objectid AND status <> :returned AND id <> :id AND timestart <= :timestart';
+        $selectparams = [
+            'objectid' => $reservation->objectid,
+            'returned' => 'returned',
+            'id' => $reservation->id,
+            'timestart' => $reservation->timestart,
+        ];
+        // Update timemodified first so the "status <> returned" selection still matches.
+        $DB->set_field_select('local_inventario_reserv', 'timemodified', $now, $select, $selectparams);
+        $DB->set_field_select('local_inventario_reserv', 'status', 'returned', $select, $selectparams);
 
         $this->mark_object_available($reservation->objectid);
+        $this->trigger_reservation_cancelled((int)$reservation->id, (int)$reservation->objectid);
     }
 
     /**

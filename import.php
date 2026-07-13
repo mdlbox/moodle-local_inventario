@@ -30,10 +30,6 @@ require_login();
 $context = context_system::instance();
 require_capability('local/inventario:manageobjects', $context);
 
-$license = local_inventario_license()->refresh();
-if ($license->status !== 'pro' || empty($license->apikey)) {
-    throw new moodle_exception('prorequired', 'local_inventario');
-}
 
 $exportkind = optional_param('export', '', PARAM_ALPHA);
 $kindtemplate = optional_param('template', '', PARAM_ALPHA);
@@ -50,41 +46,66 @@ $PAGE->set_url('/local/inventario/import.php');
 $PAGE->set_context($context);
 $PAGE->set_title(get_string('importcsv', 'local_inventario'));
 $PAGE->set_heading(get_string('importcsv', 'local_inventario'));
-$PAGE->requires->css('/local/inventario/styles.css');
 
 $forms = [
-    'properties' => new local_inventario_import_csv_form($PAGE->url, ['kind' => 'properties']),
-    'types' => new local_inventario_import_csv_form($PAGE->url, ['kind' => 'types']),
-    'objects' => new local_inventario_import_csv_form($PAGE->url, ['kind' => 'objects']),
+    'properties' => new local_inventario_import_csv_form(
+        $PAGE->url,
+        ['kind' => 'properties'],
+        'post',
+        '',
+        ['data-random-ids' => true]
+    ),
+    'types' => new local_inventario_import_csv_form(
+        $PAGE->url,
+        ['kind' => 'types'],
+        'post',
+        '',
+        ['data-random-ids' => true]
+    ),
+    'objects' => new local_inventario_import_csv_form(
+        $PAGE->url,
+        ['kind' => 'objects'],
+        'post',
+        '',
+        ['data-random-ids' => true]
+    ),
 ];
 
 $notifymessages = [];
+$submittedkind = optional_param('kind', '', PARAM_ALPHA);
 foreach ($forms as $kind => $form) {
     if ($form->is_cancelled()) {
         redirect(new moodle_url('/local/inventario/index.php'));
+    }
+    if ($submittedkind !== '' && $submittedkind !== $kind) {
+        continue;
     }
     if ($data = $form->get_data()) {
         $tempfile = $form->save_temp_file('csvfile');
         if (!$tempfile) {
             throw new moodle_exception('nofile');
         }
-        switch ($kind) {
-            case 'properties':
-                $result = $service->import_properties_from_csv($tempfile);
-                break;
-            case 'types':
-                $result = $typeservice->import_types_from_csv($tempfile);
-                break;
-            case 'objects':
-            default:
-                $result = $service->import_objects_from_csv($tempfile, $USER->id);
-                break;
-        }
-        $notifymessages[] = get_string('importcsvresult', 'local_inventario', (object)$result);
-        if (!empty($result['errors'])) {
-            foreach ($result['errors'] as $error) {
-                \core\notification::warning($error);
+        try {
+            switch ($kind) {
+                case 'properties':
+                    $result = $service->import_properties_from_csv($tempfile);
+                    break;
+                case 'types':
+                    $result = $typeservice->import_types_from_csv($tempfile);
+                    break;
+                case 'objects':
+                default:
+                    $result = $service->import_objects_from_csv($tempfile, $USER->id);
+                    break;
             }
+            $notifymessages[] = get_string('importcsvresult', 'local_inventario', (object)$result);
+            if (!empty($result['errors'])) {
+                foreach ($result['errors'] as $error) {
+                    \core\notification::warning($error);
+                }
+            }
+        } catch (\Throwable $e) {
+            \core\notification::error($e->getMessage());
         }
     }
 }
@@ -154,18 +175,38 @@ echo $OUTPUT->footer();
  * @return void
  */
 function local_inventario_output_import_template(string $kind): void {
+    global $DB;
+
+    $typename = get_string('type', 'local_inventario');
+    $typeexists = $DB->get_records('local_inventario_types', null, 'name ASC', 'id,name', 0, 1);
+    if (!empty($typeexists)) {
+        $typename = (string)reset($typeexists)->name;
+    }
+
+    $sitename = get_string('site', 'local_inventario');
+    $siteexists = $DB->get_records('local_inventario_sites', null, 'name ASC', 'id,name', 0, 1);
+    if (!empty($siteexists)) {
+        $sitename = (string)reset($siteexists)->name;
+    }
+
+    $propshortname = 'capacity';
+    $propexists = $DB->get_records('local_inventario_properties', null, 'sortorder ASC, name ASC', 'id,shortname', 0, 1);
+    if (!empty($propexists)) {
+        $propshortname = (string)reset($propexists)->shortname;
+    }
+
     $templates = [
         'properties' => [
             ['name', 'shortname', 'datatype', 'options', 'required', 'sortorder', 'parentshortname'],
             ['Capienza', 'capacity', 'number', '', '0', '0', ''],
         ],
         'types' => [
-            ['name', 'description', 'color', 'properties'],
-            ['Aula Informatica', 'Laboratorio PC', '#2563eb', 'capacity'],
+            ['name', 'description', 'color', 'properties', 'requiresreturn', 'requireslocation'],
+            ['Aula Informatica', 'Laboratorio PC', '#2563eb', $propshortname, '1', '1'],
         ],
         'objects' => [
             ['name', 'description', 'type', 'site', 'status', 'visible', 'currentlocation'],
-            ['Aula 101', 'Aula magna', 'Aula Informatica', 'Sede 1', 'available', '1', 'Piano terra'],
+            ['Aula 101', 'Aula magna', $typename, $sitename, 'available', '1', 'Piano terra'],
         ],
     ];
 
@@ -279,8 +320,25 @@ function local_inventario_output_export_csv(
     $output = fopen('php://output', 'w');
     fputcsv($output, $headers, ',', '"', '\\');
     foreach ($rows as $row) {
-        fputcsv($output, $row, ',', '"', '\\');
+        fputcsv($output, array_map('local_inventario_csv_escape_cell', $row), ',', '"', '\\');
     }
     fclose($output);
     exit;
+}
+
+/**
+ * Neutralise spreadsheet formula injection by prefixing risky cell values.
+ *
+ * A leading =, +, -, @, tab or carriage return can make spreadsheet software
+ * evaluate the cell as a formula, so such values are prefixed with an apostrophe.
+ *
+ * @param mixed $value
+ * @return string
+ */
+function local_inventario_csv_escape_cell($value): string {
+    $value = (string)$value;
+    if ($value !== '' && in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
+        return "'" . $value;
+    }
+    return $value;
 }

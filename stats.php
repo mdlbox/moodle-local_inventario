@@ -28,6 +28,11 @@ require_once(__DIR__ . '/locallib.php');
 require_login();
 $context = context_system::instance();
 require_capability('local/inventario:view', $context);
+$canviewallreservations = has_capability('local/inventario:manageobjects', $context)
+    || has_capability('local/inventario:deletereservations', $context);
+if (!$canviewallreservations) {
+    throw new required_capability_exception($context, 'local/inventario:manageobjects', 'nopermissions', '');
+}
 
 $license = local_inventario_license()->refresh();
 $objectfilter = optional_param('objectid', 0, PARAM_INT);
@@ -66,12 +71,12 @@ if (!empty($objectslist)) {
         } else if ($value === '0') {
             $value = get_string('no');
         }
-        $objectprops[$pv->objectid][] = format_string($pv->name) . ': ' . s($value);
+        $objectprops[$pv->objectid][] = s(format_string($pv->name)) . ': ' . s($value);
     }
 }
 // Prepare history per object (only for Pro).
 $objecthistory = [];
-if ($license->status === 'pro' && !empty($objectslist)) {
+if ($license->status === 'pro' && $canviewallreservations && !empty($objectslist)) {
     global $DB;
     [$insqlh, $paramsh] = $DB->get_in_or_equal(array_keys($objectslist), SQL_PARAMS_NAMED);
     // Select reservation id first to keep array keys unique per reservation.
@@ -180,28 +185,5 @@ echo html_writer::div(
     ['id' => 'inventario-objects-block']
 );
 echo html_writer::end_div();
-$PAGE->requires->js_init_code(<<<JS
-(function() {
-    const toggles = document.querySelectorAll('.inventario-history-toggle');
-    toggles.forEach(function(btn) {
-        btn.addEventListener('click', function(e) {
-            e.preventDefault();
-            const target = document.getElementById(btn.dataset.target);
-            if (!target) {
-                return;
-            }
-            const extras = target.querySelectorAll('.inventario-history-extra');
-            if (!extras.length) {
-                return;
-            }
-            const hidden = extras[0].classList.contains('d-none');
-            extras.forEach(function(el) {
-                el.classList.toggle('d-none', !hidden);
-            });
-            btn.textContent = hidden ? btn.dataset.less : btn.dataset.more;
-        });
-    });
-})();
-JS
-);
+$PAGE->requires->js_call_amd('local_inventario/statshistory', 'init');
 echo $OUTPUT->footer();

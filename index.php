@@ -32,17 +32,21 @@ require_capability('local/inventario:view', $context);
 
 $siteid = optional_param('siteid', 0, PARAM_INT);
 $onlyavailable = optional_param('available', 0, PARAM_BOOL);
-$search = optional_param('search', '', PARAM_RAW_TRIMMED);
+$search = optional_param('search', '', PARAM_TEXT);
 $typefilter = optional_param('typeid', 0, PARAM_INT);
 $statusfilter = optional_param('status', '', PARAM_ALPHA);
 $perpage = optional_param('perpage', 10, PARAM_INT);
 $resperpage = optional_param('resperpage', 10, PARAM_INT);
 $allowedperpage = [10, 20, 50, 100, 0];
+$allowedstatusfilters = ['', 'available', 'reserved', 'offsite', 'unavailable'];
 if (!in_array($perpage, $allowedperpage, true)) {
     $perpage = 20;
 }
 if (!in_array($resperpage, $allowedperpage, true)) {
     $resperpage = 20;
+}
+if (!in_array($statusfilter, $allowedstatusfilters, true)) {
+    $statusfilter = '';
 }
 
 $PAGE->set_url(new moodle_url('/local/inventario/index.php', [
@@ -57,18 +61,17 @@ $PAGE->set_url(new moodle_url('/local/inventario/index.php', [
 $PAGE->set_context($context);
 $PAGE->set_title(get_string('pluginname', 'local_inventario'));
 $PAGE->set_heading(get_string('pluginname', 'local_inventario'));
-$PAGE->requires->css('/local/inventario/styles.css');
 $PAGE->requires->js_call_amd('local_inventario/dashboard', 'init');
 $PAGE->requires->js_call_amd('local_inventario/objectmodal', 'init');
 
-$licensemanager = local_inventario_license();
-$license = $licensemanager->refresh();
-$allowhidden = $licensemanager->is_feature_enabled('hidden');
 $includehidden = local_inventario_can_see_hidden();
 
 $service = local_inventario_service();
 $siteoptionsraw = local_inventario_site_options();
 $typeoptionsraw = local_inventario_type_options();
+$canmanage = has_capability('local/inventario:manageobjects', $context);
+$canreserve = has_capability('local/inventario:reserve', $context);
+$canviewallreservations = $canmanage || has_capability('local/inventario:deletereservations', $context);
 $siteoptions = [];
 foreach ($siteoptionsraw as $id => $name) {
     $siteoptions[] = [
@@ -79,7 +82,11 @@ foreach ($siteoptionsraw as $id => $name) {
 }
 
 $objects = $service->get_objects($includehidden, $siteid ?: null, (bool)$onlyavailable);
-$reservations = $service->get_reservations(['siteid' => $siteid ?: null], $includehidden);
+$reservationfilters = ['siteid' => $siteid ?: null];
+if (!$canviewallreservations) {
+    $reservationfilters['userid'] = (int)$USER->id;
+}
+$reservations = $service->get_reservations($reservationfilters, $includehidden);
 $stats = $service->get_stats($includehidden);
 $stats['userreservations'] = (int)$service->get_user_reservation_total((int)$USER->id);
 if (!isset($stats['userreservations'])) {
@@ -107,9 +114,6 @@ if ($perpage > 0 && $totalobjects > $perpage) {
     $objects = array_slice($objects, 0, $perpage);
 }
 
-$canmanage = has_capability('local/inventario:manageobjects', $context);
-$canreserve = has_capability('local/inventario:reserve', $context);
-
 $propertiesdefs = $service->get_properties();
 $propertynames = [];
 foreach ($propertiesdefs as $prop) {
@@ -125,7 +129,11 @@ foreach ($objects as $object) {
         $statuslabel = get_string('status_unavailable', 'local_inventario');
         $statusclass = 'badge bg-secondary text-white';
     } else {
-        $statuskey = $hasactive ? $object->status : 'available';
+        $objectstatus = clean_param((string)$object->status, PARAM_ALPHA);
+        if (!in_array($objectstatus, ['available', 'reserved', 'offsite'], true)) {
+            $objectstatus = 'available';
+        }
+        $statuskey = $hasactive ? $objectstatus : 'available';
         $statuslabel = get_string('status_' . $statuskey, 'local_inventario');
         $statusclass = $statuskey === 'available' ? 'badge bg-success text-white' : 'badge bg-danger text-white';
     }
@@ -138,8 +146,8 @@ foreach ($objects as $object) {
         );
     }
     $namebadge = format_string($object->name);
-    $lastres = $service->get_last_reservation_summary($object->id);
-    if ($lastres && $lastres['status'] === 'active') {
+    $lastres = $canviewallreservations ? $service->get_last_reservation_summary($object->id) : null;
+    if ($hasactive) {
         $namebadge .= ' ' . html_writer::span(
             get_string('reservationactive', 'local_inventario'),
             'badge bg-success text-white ms-1'
@@ -157,7 +165,7 @@ foreach ($objects as $object) {
         } else {
             $valdisplay = $val;
         }
-        $proplines[] = $label . ': ' . s($valdisplay);
+        $proplines[] = s($label) . ': ' . s($valdisplay);
     }
 
     $detailparts = [];
@@ -186,7 +194,7 @@ foreach ($objects as $object) {
     if (!empty($object->description)) {
         $detailparts[] = html_writer::div(
             html_writer::tag('strong', get_string('description') . ': ') .
-            format_text($object->description, FORMAT_HTML),
+            format_text($object->description, FORMAT_HTML, ['context' => $context]),
             'mt-2'
         );
     }
@@ -194,22 +202,22 @@ foreach ($objects as $object) {
     if (!empty($object->availableperiodenabled)) {
         $availabilitylines = [];
         if (!empty($object->availablefrom)) {
-            $availabilitylines[] = get_string('availability_from', 'local_inventario') . ': ' . userdate($object->availablefrom);
+            $availabilitylines[] = s(get_string('availability_from', 'local_inventario') . ': ' . userdate($object->availablefrom));
         }
         if (!empty($object->availableto)) {
-            $availabilitylines[] = get_string('availability_to', 'local_inventario') . ': ' . userdate($object->availableto);
+            $availabilitylines[] = s(get_string('availability_to', 'local_inventario') . ': ' . userdate($object->availableto));
         }
         $slotsraw = trim((string)$object->availabletimes);
         if ($slotsraw !== '') {
             $slots = array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $slotsraw)));
             if (!empty($slots)) {
-                $availabilitylines[] = get_string('availability_times', 'local_inventario') . ': ' . implode(', ', $slots);
+                $availabilitylines[] = s(get_string('availability_times', 'local_inventario') . ': ' . implode(', ', $slots));
             }
         }
         $availabilitystatus = $currentlyavailable
             ? get_string('status_available', 'local_inventario')
             : get_string('status_unavailable', 'local_inventario');
-        $availabilitylines[] = get_string('status', 'local_inventario') . ': ' . $availabilitystatus;
+        $availabilitylines[] = s(get_string('status', 'local_inventario') . ': ' . $availabilitystatus);
         $detailparts[] = html_writer::div(
             html_writer::tag('strong', get_string('availability', 'local_inventario')) . ' ' .
             html_writer::alist($availabilitylines),
@@ -272,12 +280,6 @@ foreach ($reservationslist as $reservation) {
 }
 
 $renderable = new \local_inventario\output\dashboard([
-    'license' => [
-        'status' => $license->status,
-        'expires' => $license->expiresat ? userdate($license->expiresat) : '',
-        'domain' => $license->domain,
-        'allowhidden' => $allowhidden,
-    ],
     'filters' => [
         'siteoptions' => $siteoptions,
         'selectedsite' => $siteid,
@@ -362,7 +364,6 @@ $renderable = new \local_inventario\output\dashboard([
         'properties' => (new moodle_url('/local/inventario/properties.php'))->out(false),
         'reservations' => (new moodle_url('/local/inventario/reservations.php'))->out(false),
         'stats' => (new moodle_url('/local/inventario/stats.php'))->out(false),
-        'license' => (new moodle_url('/local/inventario/license.php'))->out(false),
     ],
     'canmanage' => $canmanage,
     'canreserve' => $canreserve,
@@ -372,18 +373,6 @@ $renderer = $PAGE->get_renderer('local_inventario');
 
 echo $OUTPUT->header();
 echo local_inventario_render_nav($context);
-
-if (!empty($license->expiresat) && $license->expiresat < time()) {
-    echo $OUTPUT->notification(
-        get_string('licenseexpired', 'local_inventario', userdate($license->expiresat)),
-        'error'
-    );
-} else if ($license->status !== 'pro') {
-    echo $OUTPUT->notification(
-        get_string('licenseinvalid', 'local_inventario'),
-        'warning'
-    );
-}
 
 echo $renderer->render_dashboard($renderable);
 echo $OUTPUT->footer();

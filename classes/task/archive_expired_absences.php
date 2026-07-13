@@ -14,37 +14,40 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace local_inventario\task;
-
-defined('MOODLE_INTERNAL') || die();
-
-require_once($CFG->dirroot . '/local/inventario/locallib.php');
-
 /**
- * Scheduled task to sync license and ping installation.
+ * Archive expired absences.
  *
  * @package   local_inventario
  * @copyright 2026 mdlbox - https://mdlbox.com
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class license_sync extends \core\task\scheduled_task {
+
+namespace local_inventario\task;
+
+use local_inventario\local\absence_service;
+
+/**
+ * Scheduled task to move expired absences into archive.
+ */
+class archive_expired_absences extends \core\task\scheduled_task {
     /**
-     * Task name shown in admin UI.
+     * Task name.
      *
      * @return string
      */
     public function get_name(): string {
-        return get_string('license', 'local_inventario');
+        return get_string('task_archiveabsences', 'local_inventario');
     }
 
     /**
-     * Execute the task and refresh license status.
+     * Execute task.
      */
     public function execute(): void {
-        $license = local_inventario_license();
-        // Force refresh to validate API key and update status (Pro/Free).
-        $license->refresh(true);
-        // Final safety: downgrade if expiry is in the past.
-        $license->downgrade_if_expired();
+        $service = new absence_service();
+        $count = $service->archive_expired_absences();
+        if ($count > 0) {
+            mtrace('[local_inventario] Archived absences: ' . $count);
+        }
     }
 }
+

@@ -33,6 +33,42 @@ defined('MOODLE_INTERNAL') || die();
 require_once(__DIR__ . '/locallib.php');
 
 /**
+ * Serve object photos and attachments.
+ *
+ * @param stdClass $course
+ * @param stdClass $cm
+ * @param context $context
+ * @param string $filearea
+ * @param array $args
+ * @param bool $forcedownload
+ * @param array $options
+ * @return bool false if the file was not found
+ */
+function local_inventario_pluginfile($course, $cm, $context, $filearea, $args, $forcedownload, array $options = []): bool {
+    if ($context->contextlevel != CONTEXT_SYSTEM || $filearea !== 'objectfiles') {
+        return false;
+    }
+
+    require_login();
+    if (!has_capability('local/inventario:view', $context)) {
+        return false;
+    }
+
+    $itemid = (int)array_shift($args);
+    $filename = array_pop($args);
+    $filepath = $args ? '/' . implode('/', $args) . '/' : '/';
+
+    $fs = get_file_storage();
+    $file = $fs->get_file($context->id, 'local_inventario', $filearea, $itemid, $filepath, $filename);
+    if (!$file || $file->is_directory()) {
+        return false;
+    }
+
+    send_stored_file($file, 86400, 0, $forcedownload, $options);
+    return true;
+}
+
+/**
  * Adds a node to the site navigation.
  *
  * @param global_navigation $navigation
@@ -55,26 +91,3 @@ function local_inventario_extend_navigation(global_navigation $navigation): void
     $navigation->add_node($node);
 }
 
-/**
- * Add settings link in the admin navigation.
- *
- * Signature must accept the context as second parameter, see core navigation callbacks.
- *
- * @param settings_navigation $settingsnav
- * @param context|null $context
- */
-function local_inventario_extend_settings_navigation(settings_navigation $settingsnav, $context = null): void {
-    if (!has_capability('local/inventario:manageobjects', context_system::instance())) {
-        return;
-    }
-    $url = new moodle_url('/local/inventario/license.php');
-    $node = navigation_node::create(
-        get_string('license', 'local_inventario'),
-        $url,
-        navigation_node::TYPE_SETTING,
-        null,
-        'local_inventario_license',
-        new pix_icon('i/settings', '')
-    );
-    $settingsnav->add_node($node);
-}

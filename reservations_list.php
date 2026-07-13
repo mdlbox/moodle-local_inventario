@@ -24,36 +24,118 @@
 
 require_once(__DIR__ . '/../../config.php');
 require_once(__DIR__ . '/locallib.php');
+require_once(__DIR__ . '/forms/reservations_list_filters_form.php');
 
 require_login();
 $context = context_system::instance();
+$canmanageall = has_capability('local/inventario:manageobjects', $context)
+    || has_capability('local/inventario:deletereservations', $context);
+$canreserve = has_capability('local/inventario:reserve', $context);
+if (!$canreserve && !$canmanageall) {
+    throw new required_capability_exception($context, 'local/inventario:reserve', 'nopermissions', '');
+}
 
 $PAGE->set_url('/local/inventario/reservations_list.php');
 $PAGE->set_context($context);
 $PAGE->set_title(get_string('reservations', 'local_inventario'));
 $PAGE->set_heading(get_string('reservations', 'local_inventario'));
-$PAGE->requires->css('/local/inventario/styles.css');
 
 $license = local_inventario_license()->refresh();
 $service = local_inventario_service();
 $includehidden = local_inventario_can_see_hidden();
-$canreserve = has_capability('local/inventario:reserve', $context);
-$canmanageobjects = has_capability('local/inventario:manageobjects', $context);
 
 // Filters (enabled only for PRO).
-$search = optional_param('search', '', PARAM_RAW_TRIMMED);
+$search = optional_param('search', '', PARAM_TEXT);
 $siteid = optional_param('siteid', 0, PARAM_INT);
 $typeid = optional_param('typeid', 0, PARAM_INT);
 $propertyid = optional_param('propertyid', 0, PARAM_INT);
-$propvalue = optional_param('propvalue', '', PARAM_RAW_TRIMMED);
+$propvalue = optional_param('propvalue', '', PARAM_TEXT);
 $objectfilter = optional_param('objectid', 0, PARAM_INT);
-$startfrom = optional_param('startfrom', 0, PARAM_INT);
-$endto = optional_param('endto', 0, PARAM_INT);
 $filteruserid = optional_param('userid', 0, PARAM_INT);
 $perpage = optional_param('perpage', 10, PARAM_INT);
+$resetfilters = optional_param('resetfilter', '', PARAM_TEXT);
+$startfrom = 0;
+$endto = 0;
 $allowedperpage = [10, 20, 50, 100, 0];
 if (!in_array($perpage, $allowedperpage, true)) {
     $perpage = 10;
+}
+if (!$canmanageall) {
+    $filteruserid = (int)$USER->id;
+}
+if ($resetfilters !== '') {
+    redirect(new moodle_url('/local/inventario/reservations_list.php'));
+}
+
+$siteoptions = local_inventario_site_options();
+$typeoptions = local_inventario_type_options();
+$propertyoptions = array_map(static fn($p) => format_string($p->name), $service->get_properties());
+$useroptions = $canmanageall ? local_inventario_user_options() : [(int)$USER->id => fullname($USER)];
+
+$filterform = null;
+if ($license->status === 'pro') {
+    $perpageoptions = [];
+    foreach ($allowedperpage as $opt) {
+        $perpageoptions[$opt] = ($opt === 0) ? get_string('all', 'local_inventario') : (string)$opt;
+    }
+
+    $filterform = new local_inventario_reservations_list_filters_form(
+        new moodle_url('/local/inventario/reservations_list.php'),
+        [
+            'siteoptions' => $siteoptions,
+            'typeoptions' => $typeoptions,
+            'propertyoptions' => $propertyoptions,
+            'useroptions' => $useroptions,
+            'canmanageall' => $canmanageall,
+            'currentuserid' => (int)$USER->id,
+            'perpageoptions' => $perpageoptions,
+            'objectid' => $objectfilter,
+        ],
+        'get',
+        '',
+        ['class' => 'mform inventario-filters']
+    );
+
+    if ($formdata = $filterform->get_data()) {
+        $search = trim((string)($formdata->search ?? ''));
+        $siteid = (int)($formdata->siteid ?? 0);
+        $typeid = (int)($formdata->typeid ?? 0);
+        $propertyid = (int)($formdata->propertyid ?? 0);
+        $propvalue = trim((string)($formdata->propvalue ?? ''));
+        $objectfilter = (int)($formdata->objectid ?? $objectfilter);
+        $perpage = (int)($formdata->perpage ?? $perpage);
+        if (!in_array($perpage, $allowedperpage, true)) {
+            $perpage = 10;
+        }
+        if ($canmanageall) {
+            $filteruserid = (int)($formdata->userid ?? 0);
+        } else {
+            $filteruserid = (int)$USER->id;
+        }
+
+        $startfromday = !empty($formdata->startfrom) ? (int)$formdata->startfrom : 0;
+        $endtody = !empty($formdata->endto) ? (int)$formdata->endto : 0;
+        $startfrom = $startfromday;
+        $endto = $endtody ? ($endtody + DAYSECS - 1) : 0;
+    }
+
+    $filterdefaults = (object)[
+        'search' => $search,
+        'siteid' => $siteid,
+        'typeid' => $typeid,
+        'propertyid' => $propertyid,
+        'propvalue' => $propvalue,
+        'userid' => $filteruserid,
+        'perpage' => $perpage,
+        'objectid' => $objectfilter,
+    ];
+    if ($startfrom > 0) {
+        $filterdefaults->startfrom = $startfrom;
+    }
+    if ($endto > 0) {
+        $filterdefaults->endto = $endto - DAYSECS + 1;
+    }
+    $filterform->set_data($filterdefaults);
 }
 
 $filters = [];
@@ -86,12 +168,11 @@ if ($license->status === 'pro') {
         $filters['endto'] = $endto;
     }
 }
+if (!$canmanageall) {
+    $filters['userid'] = (int)$USER->id;
+}
 
 $reservations = $service->get_reservations($filters, $includehidden);
-$siteoptions = local_inventario_site_options();
-$typeoptions = local_inventario_type_options();
-$propertyoptions = array_map(static fn($p) => format_string($p->name), $service->get_properties());
-$useroptions = local_inventario_user_options();
 
 echo $OUTPUT->header();
 echo local_inventario_render_nav($context);
@@ -112,167 +193,9 @@ if (!empty($actionbuttons)) {
 
 // Filters (only PRO).
 if ($license->status === 'pro') {
-    echo html_writer::start_div('card mb-3 shadow-sm');
-    echo html_writer::start_div('card-body');
-    $formurl = new moodle_url($PAGE->url);
-    $formattrs = ['method' => 'get', 'action' => $formurl->out(false), 'class' => 'mform'];
-    echo html_writer::start_tag('form', $formattrs);
-    echo html_writer::tag('legend', get_string('filters', 'local_inventario'));
-
-    echo html_writer::start_div('d-flex justify-content-end');
-    echo html_writer::start_tag('table', [
-        'class' => 'generaltable boxaligncenter inventario-filter-table',
-    ]);
-    // Row 1: search + site.
-    echo html_writer::start_tag('tr', ['class' => 'inventario-filter-row']);
-    echo html_writer::tag('th', html_writer::label(get_string('search'), 'search'));
-    echo html_writer::tag('td', html_writer::empty_tag('input', [
-        'type' => 'text',
-        'name' => 'search',
-        'id' => 'search',
-        'value' => $search,
-        'placeholder' => get_string('search'),
-        'class' => 'form-control',
-    ]));
-    echo html_writer::tag('th', html_writer::label(get_string('site', 'local_inventario'), 'siteid'));
-    echo html_writer::tag('td', html_writer::select(
-        [0 => get_string('all', 'local_inventario')] + $siteoptions,
-        'siteid',
-        $siteid,
-        null,
-        ['id' => 'siteid', 'class' => 'custom-select']
-    ));
-    echo html_writer::end_tag('tr');
-
-    // Row 2: type + property.
-    echo html_writer::start_tag('tr', ['class' => 'inventario-filter-row']);
-    echo html_writer::tag('th', html_writer::label(get_string('type', 'local_inventario'), 'typeid'));
-    echo html_writer::tag('td', html_writer::select(
-        [0 => get_string('all', 'local_inventario')] + $typeoptions,
-        'typeid',
-        $typeid,
-        null,
-        ['id' => 'typeid', 'class' => 'custom-select']
-    ));
-    echo html_writer::tag('th', html_writer::label(get_string('property', 'local_inventario'), 'propertyid'));
-    echo html_writer::tag('td', html_writer::select(
-        [0 => get_string('all', 'local_inventario')] + $propertyoptions,
-        'propertyid',
-        $propertyid,
-        null,
-        ['id' => 'propertyid', 'class' => 'custom-select']
-    ));
-    echo html_writer::end_tag('tr');
-
-    // Row 3: property value + user.
-    echo html_writer::start_tag('tr', ['class' => 'inventario-filter-row']);
-    echo html_writer::tag('th', html_writer::label(get_string('propertyvalue', 'local_inventario'), 'propvalue'));
-    echo html_writer::tag('td', html_writer::empty_tag('input', [
-        'type' => 'text',
-        'name' => 'propvalue',
-        'id' => 'propvalue',
-        'value' => $propvalue,
-        'class' => 'form-control',
-    ]));
-    echo html_writer::tag('th', html_writer::label(get_string('user'), 'userid'));
-    echo html_writer::tag('td', html_writer::select(
-        [0 => get_string('all', 'local_inventario')] + $useroptions,
-        'userid',
-        $filteruserid,
-        null,
-        ['id' => 'userid', 'class' => 'custom-select']
-    ));
-    echo html_writer::end_tag('tr');
-
-    // Row 4: date range.
-    echo html_writer::start_tag('tr', ['class' => 'inventario-filter-row']);
-    echo html_writer::tag('th', html_writer::label(get_string('starttime', 'local_inventario'), 'startfrom'));
-    echo html_writer::tag('td', html_writer::empty_tag('input', [
-        'type' => 'date',
-        'name' => 'startfrom',
-        'id' => 'startfrom',
-        'value' => $startfrom ? date('Y-m-d', $startfrom) : '',
-        'class' => 'form-control',
-    ]));
-    echo html_writer::tag('th', html_writer::label(get_string('endtime', 'local_inventario'), 'endto'));
-    echo html_writer::tag('td', html_writer::empty_tag('input', [
-        'type' => 'date',
-        'name' => 'endto',
-        'id' => 'endto',
-        'value' => $endto ? date('Y-m-d', $endto) : '',
-        'class' => 'form-control',
-    ]));
-    echo html_writer::end_tag('tr');
-
-    // Submit row.
-    echo html_writer::start_tag('tr');
-    echo html_writer::tag('td', '', ['colspan' => 2]);
-    // Per-page selector inline with buttons.
-    $optionshtml = '';
-    foreach ($allowedperpage as $opt) {
-        $attrs = ['value' => $opt];
-        if ((int)$opt === (int)$perpage) {
-            $attrs['selected'] = 'selected';
-        }
-        $label = $opt === 0 ? get_string('all', 'local_inventario') : $opt;
-        $optionshtml .= html_writer::tag('option', $label, $attrs);
+    if ($filterform) {
+        echo local_inventario_render_filter_card($filterform->render());
     }
-    $controls = html_writer::tag(
-        'label',
-        get_string('itemsperpage', 'local_inventario'),
-        ['for' => 'perpage', 'class' => 'me-2 mb-0']
-    );
-    $controls .= html_writer::tag(
-        'select',
-        $optionshtml,
-        ['name' => 'perpage', 'id' => 'perpage', 'class' => 'custom-select w-auto me-2']
-    );
-
-    $submitcell = html_writer::empty_tag('input', [
-        'type' => 'submit',
-        'value' => get_string('filter', 'local_inventario'),
-        'class' => 'btn btn-primary me-2',
-    ]);
-    // Reset filters.
-    $reseturl = new moodle_url($PAGE->url);
-    $submitcell .= html_writer::link(
-        $reseturl,
-        get_string('resetfilters', 'local_inventario'),
-        ['class' => 'btn btn-secondary']
-    );
-    $submitcontent = html_writer::div(
-        $controls . $submitcell,
-        'd-inline-flex align-items-center flex-wrap justify-content-end gap-2'
-    );
-    if ($objectfilter) {
-        $submitcontent .= html_writer::empty_tag('input', [
-            'type' => 'hidden',
-            'name' => 'objectid',
-            'value' => $objectfilter,
-        ]);
-    }
-    if ($startfrom) {
-        $submitcontent .= html_writer::empty_tag('input', [
-            'type' => 'hidden',
-            'name' => 'startfrom',
-            'value' => $startfrom,
-        ]);
-    }
-    if ($endto) {
-        $submitcontent .= html_writer::empty_tag('input', [
-            'type' => 'hidden',
-            'name' => 'endto',
-            'value' => $endto,
-        ]);
-    }
-    echo html_writer::tag('td', $submitcontent, ['colspan' => 2, 'class' => 'text-end']);
-    echo html_writer::end_tag('tr');
-
-    echo html_writer::end_tag('table');
-    echo html_writer::end_div(); // End align right wrapper.
-    echo html_writer::end_tag('form');
-    echo html_writer::end_div();
-    echo html_writer::end_div();
 }
 
 // Prepare tooltip data for object properties.
@@ -297,7 +220,7 @@ if (!empty($reservations)) {
             } else if ($val === '0') {
                 $val = get_string('no');
             }
-            $objectprops[$pv->objectid][] = format_string($pv->name) . ': ' . s($val);
+            $objectprops[$pv->objectid][] = s(format_string($pv->name)) . ': ' . s($val);
         }
     }
 }
@@ -317,7 +240,6 @@ $table->colclasses = array_fill(0, count($table->head), '');
 $table->colclasses[count($table->head) - 1] = 'inventario-actions-col';
 
 $typebyid = $typeoptions;
-$propertynames = $service->get_properties();
 $detailblocks = [];
 $seenobjects = [];
 
@@ -343,7 +265,7 @@ foreach ($reservations as $reservation) {
             format_string($typebyid[$reservation->typeid] ?? '')
         );
         $detailparts[] = html_writer::div(
-            html_writer::tag('strong', get_string('user') . ': ') . fullname($reservation)
+            html_writer::tag('strong', get_string('user') . ': ') . s(fullname($reservation))
         );
         $detailparts[] = html_writer::div(
             html_writer::tag('strong', get_string('period', 'local_inventario') . ': ') .
@@ -382,7 +304,7 @@ foreach ($reservations as $reservation) {
     $table->data[] = [
         $objectcell,
         format_string($typebyid[$reservation->typeid] ?? ''),
-        fullname($reservation),
+        s(fullname($reservation)),
         format_string($reservation->sitename),
         userdate($reservation->timestart) . ' â†’ ' . userdate($reservation->timeend),
         format_string($reservation->location),
@@ -427,18 +349,6 @@ echo html_writer::tag(
     ['class' => 'modal fade', 'id' => 'inventario-res-modal', 'tabindex' => '-1', 'role' => 'dialog', 'aria-hidden' => 'true']
 );
 
-$PAGE->requires->js_init_code("
-require(['jquery'], function($) {
-    $(document).on('click', '.inventario-res-info', function(e) {
-        e.preventDefault();
-        const targetId = $(this).data('detail-id');
-        const title = $(this).data('detail-title') || '';
-        const content = $('#' + targetId).html() || '';
-        $('#inventario-res-modal-title').text(title || '" . get_string('info') . "');
-        $('#inventario-res-modal-body').html(content);
-        $('#inventario-res-modal').modal('show');
-    });
-});
-");
+$PAGE->requires->js_call_amd('local_inventario/reslistmodal', 'init', [get_string('info')]);
 
 echo $OUTPUT->footer();

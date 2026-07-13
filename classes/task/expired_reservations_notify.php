@@ -48,14 +48,6 @@ class expired_reservations_notify extends \core\task\scheduled_task {
         require_once($CFG->libdir . '/messagelib.php');
         require_once($CFG->dirroot . '/local/inventario/locallib.php');
 
-        // Best-effort heartbeat: ping the license backend so the installation is visible as recently contacted.
-        try {
-            $license = \local_inventario_license();
-            $license->refresh(true);
-        } catch (\Throwable $ignore) {
-            debugging($ignore->getMessage(), DEBUG_DEVELOPER);
-        }
-
         $now = time();
         $sql = "SELECT r.*, u.id AS userid, u.lang AS userlang, o.name AS objectname
                   FROM {local_inventario_reserv} r

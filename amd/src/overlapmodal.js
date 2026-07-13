@@ -1,4 +1,3 @@
-<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -15,18 +14,20 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * AJAX endpoints for inventory actions.
+ * Show the reservation error modal (overlap, availability, ...).
  *
- * @package   local_inventario
- * @copyright 2026 mdlbox - https://mdlbox.com
- * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @module     local_inventario/overlapmodal
+ * @copyright  2026 mdlbox - https://mdlbox.com
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-
-define('AJAX_SCRIPT', true);
-
-require_once(__DIR__ . '/../../config.php');
-
-require_login();
-
-// Deprecated: use external services (webservice AJAX) defined in db/services.php.
-throw new moodle_exception('deprecatedajax', 'local_inventario');
+define(['jquery'], function($) {
+    return {
+        /**
+         * @param {String} message The error message to display.
+         */
+        init: function(message) {
+            $('#inventario-overlap-modal-body').text(message);
+            $('#inventario-overlap-modal').modal('show');
+        }
+    };
+});
